@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Variables CSS pour le thème */
+:root {
+  --color-primary: #dc2626; /* red-600 */
+  --color-primary-dark: #991b1b; /* red-800 */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Thème sombre (défaut) */
+:root, .theme-dark {
+  --color-bg: #020617;
+  --color-bg-secondary: #0f172a;
+  --color-surface: #1e293b;
+  --color-text: #ffffff;
+  --color-text-secondary: #94a3b8;
+  --color-border: #334155;
+}
+
+/* Thème clair */
+.theme-light {
+  --color-bg: #f8fafc;
+  --color-bg-secondary: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-border: #e2e8f0;
+}
+
+/* Reset et base */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 
+               'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Safe area pour les encoches et barres de navigation */
+.safe-area-inset {
+  padding-top: var(--safe-area-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+/* Désactiver la sélection de texte sur les boutons */
+button, a {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Améliorer le contraste pour la lisibilité en plein soleil */
+@media (prefers-contrast: more) {
+  :root {
+    --color-primary: #ff0000;
+  }
+  
+  body {
+    background-color: #000;
+  }
+  
+  .text-slate-400 {
+    color: #94a3b8 !important;
+  }
+}
+
+/* Animation d'entrée */
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-in {
+  animation: slideInUp 0.2s ease-out;
+}
+
+/* Animation de pulsation d'urgence */
+@keyframes emergency-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+.emergency-pulse {
+  animation: emergency-pulse 0.5s ease-in-out infinite;
+}
+
+/* Animation du bouton SOS */
+@keyframes sos-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.sos-ring {
+  animation: sos-ring 1.5s ease-out infinite;
+}
+
+/* Styles pour les inputs */
+input[type="text"],
+input[type="tel"],
+input[type="email"] {
+  font-size: 16px; /* Évite le zoom automatique sur iOS */
+}
+
+/* Range slider personnalisé */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #dc2626;
+  margin-top: -6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: #334155;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: #334155;
+}
+
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 2px;
+}
+
+/* Focus visible pour l'accessibilité */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+/* Optimisations pour les performances */
+.transform-gpu {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Mode sombre forcé (pour cohérence) */
+@media (prefers-color-scheme: light) {
+  body {
+    background-color: var(--color-bg);
+    color: white;
+  }
+}
+
+/* Haute visibilité pour le mode urgence */
+.high-contrast {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+.high-contrast .text-red-500,
+.high-contrast .text-red-600 {
+  color: #ff3333 !important;
+}
+
+/* Animation de shake feedback */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.shake-feedback {
+  animation: shake 0.3s ease-in-out;
+}
+
+/* Loading spinner */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Styles pour impression (si jamais quelqu'un imprime les coordonnées) */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  
+  button, nav, header {
+    display: none !important;
+  }
+}
