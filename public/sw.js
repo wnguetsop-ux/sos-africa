@@ -1,152 +1,46 @@
-// Service Worker pour SOS Africa
-// Permet le fonctionnement hors ligne
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>SOS Africa</title>
+    
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
 
-const CACHE_NAME = 'sos-africa-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/sounds/siren.mp3',
-  '/sounds/ringtone.mp3',
-];
+    <style>
+      body { background-color: #0f172a; margin: 0; font-family: sans-serif; }
+      #loading-screen { position: fixed; inset: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+      .spinner { width: 40px; height: 40px; border: 4px solid rgba(220, 38, 38, 0.2); border-top-color: #dc2626; border-radius: 50%; animation: spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div id="loading-screen"><div class="spinner"></div></div>
+    <div id="root"></div>
+    
+    <script type="module" src="/src/main.jsx"></script>
 
-// Installation du Service Worker
-self.addEventListener('install', (event) => {
-  console.log('[SW] Installation...');
-  
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[SW] Mise en cache des ressources statiques');
-        return cache.addAll(STATIC_ASSETS);
-      })
-      .then(() => self.skipWaiting())
-  );
-});
+    <script>
+      // 1. Masquer le loader quand l'app est prête
+      window.addEventListener('load', () => {
+        const loader = document.getElementById('loading-screen');
+        setTimeout(() => { loader.style.display = 'none'; }, 500);
+      });
 
-// Activation du Service Worker
-self.addEventListener('activate', (event) => {
-  console.log('[SW] Activation...');
-  
-  event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames
-            .filter((name) => name !== CACHE_NAME)
-            .map((name) => {
-              console.log('[SW] Suppression ancien cache:', name);
-              return caches.delete(name);
-            })
-        );
-      })
-      .then(() => self.clients.claim())
-  );
-});
-
-// Stratégie de fetch: Network First, fallback sur Cache
-self.addEventListener('fetch', (event) => {
-  // Ignorer les requêtes non-GET
-  if (event.request.method !== 'GET') return;
-  
-  // Ignorer les requêtes vers d'autres domaines (sauf maps)
-  const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin && 
-      !url.hostname.includes('google')) {
-    return;
-  }
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cloner la réponse pour la mettre en cache
-        const responseClone = response.clone();
-        
-        caches.open(CACHE_NAME)
-          .then((cache) => {
-            // Ne pas cacher les API ou les requêtes POST
-            if (event.request.url.includes('/api/')) return;
-            cache.put(event.request, responseClone);
-          });
-        
-        return response;
-      })
-      .catch(() => {
-        // En cas d'échec réseau, utiliser le cache
-        return caches.match(event.request)
-          .then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            
-            // Pour les pages HTML, retourner la page principale
-            if (event.request.headers.get('accept').includes('text/html')) {
-              return caches.match('/');
-            }
-            
-            return new Response('Hors ligne', {
-              status: 503,
-              statusText: 'Service Unavailable'
-            });
-          });
-      })
-  );
-});
-
-// Gestion des notifications push (pour les alertes)
-self.addEventListener('push', (event) => {
-  console.log('[SW] Push reçu');
-  
-  const options = {
-    body: event.data ? event.data.text() : 'Nouvelle alerte SOS',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/badge-72x72.png',
-    vibrate: [200, 100, 200, 100, 200],
-    tag: 'sos-alert',
-    requireInteraction: true,
-    actions: [
-      { action: 'view', title: 'Voir' },
-      { action: 'dismiss', title: 'Ignorer' }
-    ]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification('SOS Africa - Alerte!', options)
-  );
-});
-
-// Gestion des clics sur les notifications
-self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Clic sur notification');
-  
-  event.notification.close();
-
-  if (event.action === 'view') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
-});
-
-// Synchronisation en arrière-plan (pour envoyer les SMS en attente)
-self.addEventListener('sync', (event) => {
-  console.log('[SW] Sync:', event.tag);
-  
-  if (event.tag === 'send-pending-alerts') {
-    event.waitUntil(
-      // Logique pour envoyer les alertes en attente
-      sendPendingAlerts()
-    );
-  }
-});
-
-// Fonction pour envoyer les alertes en attente
-async function sendPendingAlerts() {
-  try {
-    // Récupérer les alertes en attente depuis IndexedDB ou localStorage
-    // Cette logique serait implémentée selon les besoins
-    console.log('[SW] Envoi des alertes en attente...');
-  } catch (error) {
-    console.error('[SW] Erreur envoi alertes:', error);
-  }
-}
+      // 2. ENREGISTREMENT DU SERVICE WORKER (Crucial pour l'installation)
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('✅ SOS Africa est installable !'))
+            .catch(err => console.log('❌ Erreur PWA:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
