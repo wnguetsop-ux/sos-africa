@@ -2,37 +2,79 @@ import { useEffect, useCallback, useRef } from 'react';
 
 /**
  * Hook pour le tracking des statistiques d'utilisation
+ * Peut être connecté à Firebase Analytics pour un tracking réel
  */
 export const useAnalytics = () => {
   const sessionStartRef = useRef(Date.now());
   const pageViewsRef = useRef(0);
   const actionsRef = useRef(0);
+  const initialized = useRef(false);
 
-  // Initialiser la session au montage
+  // Initialiser au premier montage
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
     sessionStartRef.current = Date.now();
-    
-    // Incrémenter le compteur d'utilisateurs totaux (une seule fois par installation)
-    const isNewUser = !localStorage.getItem('sos_user_id');
-    if (isNewUser) {
-      const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('sos_user_id', userId);
+
+    // Vérifier si nouvel utilisateur
+    const userId = localStorage.getItem('sos_user_id');
+    if (!userId) {
+      const newUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('sos_user_id', newUserId);
       incrementStat('totalUsers');
-      incrementStat('downloads');
+      incrementStat('newUsersToday');
+      
+      // Détecter le pays (basé sur la timezone)
+      detectCountry();
     }
 
-    // Marquer comme utilisateur actif
-    incrementStat('activeUsers');
+    // Incrémenter sessions
+    incrementStat('totalSessions');
 
-    // Sauvegarder les stats de session périodiquement
-    const interval = setInterval(saveSessionStats, 30000);
+    // Sauvegarder périodiquement
+    const interval = setInterval(saveSessionStats, 10000);
 
-    // Cleanup
+    // Événement de fermeture
+    const handleBeforeUnload = () => {
+      saveSessionStats();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
       clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       saveSessionStats();
     };
   }, []);
+
+  // Détecter le pays basé sur la timezone
+  const detectCountry = () => {
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      let country = 'Autre';
+      
+      if (timezone.includes('Africa/Douala') || timezone.includes('Africa/Lagos')) {
+        country = 'Cameroun';
+      } else if (timezone.includes('Africa/Abidjan')) {
+        country = 'Côte d\'Ivoire';
+      } else if (timezone.includes('Africa/Dakar')) {
+        country = 'Sénégal';
+      } else if (timezone.includes('Europe/Paris')) {
+        country = 'France';
+      } else if (timezone.includes('Europe/Brussels')) {
+        country = 'Belgique';
+      } else if (timezone.includes('Africa/Libreville')) {
+        country = 'Gabon';
+      } else if (timezone.includes('Africa/Brazzaville') || timezone.includes('Africa/Kinshasa')) {
+        country = 'Congo';
+      }
+      
+      trackCountry(country);
+    } catch (err) {
+      console.log('Détection pays non disponible');
+    }
+  };
 
   // Incrémenter une statistique
   const incrementStat = useCallback((statName, amount = 1) => {
@@ -45,7 +87,7 @@ export const useAnalytics = () => {
     }
   }, []);
 
-  // Tracker une fonctionnalité utilisée
+  // Tracker une fonctionnalité
   const trackFeature = useCallback((featureName) => {
     try {
       const stats = JSON.parse(localStorage.getItem('sos_app_stats') || '{}');
@@ -53,14 +95,21 @@ export const useAnalytics = () => {
       stats.features[featureName] = (stats.features[featureName] || 0) + 1;
       localStorage.setItem('sos_app_stats', JSON.stringify(stats));
       actionsRef.current++;
+      
+      // Log pour debug
+      console.log(`📊 Feature tracked: ${featureName}`);
     } catch (err) {
       console.error('Erreur tracking:', err);
     }
   }, []);
 
-  // Tracker une alerte envoyée
-  const trackAlert = useCallback((alertType) => {
+  // Tracker une alerte
+  const trackAlert = useCallback((alertType, cancelled = false) => {
     incrementStat('alertsSent');
+    incrementStat('alertsToday');
+    if (cancelled) {
+      incrementStat('cancelledAlerts');
+    }
     trackFeature(alertType);
   }, [incrementStat, trackFeature]);
 
@@ -71,7 +120,10 @@ export const useAnalytics = () => {
       if (!stats.donations) stats.donations = { total: 0, count: 0 };
       stats.donations.total += amount;
       stats.donations.count += 1;
+      stats.donations.lastDonation = new Date().toISOString();
       localStorage.setItem('sos_app_stats', JSON.stringify(stats));
+      
+      console.log(`💝 Donation tracked: ${amount} FCFA`);
     } catch (err) {
       console.error('Erreur donation tracking:', err);
     }
@@ -80,9 +132,10 @@ export const useAnalytics = () => {
   // Tracker une page vue
   const trackPageView = useCallback((pageName) => {
     pageViewsRef.current++;
-  }, []);
+    incrementStat('totalPageViews');
+  }, [incrementStat]);
 
-  // Tracker le pays (basé sur la langue ou timezone)
+  // Tracker le pays
   const trackCountry = useCallback((countryName) => {
     try {
       const stats = JSON.parse(localStorage.getItem('sos_app_stats') || '{}');
@@ -109,12 +162,17 @@ export const useAnalytics = () => {
       };
 
       localStorage.setItem('sos_session_stats', JSON.stringify(sessionStats));
+
+      // Mettre à jour le temps moyen
+      const stats = JSON.parse(localStorage.getItem('sos_app_stats') || '{}');
+      stats.avgSessionTime = sessionStats.duration;
+      localStorage.setItem('sos_app_stats', JSON.stringify(stats));
     } catch (err) {
       console.error('Erreur session stats:', err);
     }
   }, []);
 
-  // Obtenir les stats actuelles
+  // Obtenir les stats
   const getStats = useCallback(() => {
     try {
       return JSON.parse(localStorage.getItem('sos_app_stats') || '{}');
