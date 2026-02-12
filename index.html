@@ -2,40 +2,44 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    
     <title>SOS Africa - Sécurité Personnelle</title>
-    <meta name="description" content="Application de sécurité personnelle pour alerter vos proches en cas de danger. Fonctionne hors connexion." />
     
     <meta name="application-name" content="SOS Africa" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="SOS Africa" />
     <meta name="mobile-web-app-capable" content="yes" />
-    
     <meta name="theme-color" content="#0f172a" />
-    <meta name="msapplication-TileColor" content="#dc2626" />
     
     <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
-    <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
-    
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     <link rel="manifest" href="/manifest.json" />
-    
-    <link rel="preconnect" href="https://www.google.com" />
-    
-    <meta name="format-detection" content="telephone=no" />
-    
+
     <style>
-      html, body, #root {
+      /* RESET COMPLET POUR LE SCROLL */
+      html {
+        background-color: #0f172a;
+        overflow-y: auto !important; /* Force le scroll vertical */
+        height: auto !important;
+      }
+
+      body {
         margin: 0;
         padding: 0;
         background-color: #0f172a;
         min-height: 100vh;
         min-height: 100dvh;
-        overflow-x: hidden;
+        overflow-y: auto !important; /* Autorise le scroll */
+        -webkit-overflow-scrolling: touch; /* Scroll fluide iOS */
+        position: relative;
       }
-      
+
+      #root {
+        min-height: 100vh;
+        display: block; /* Évite les conflits flexbox sur le scroll global */
+      }
+
+      /* Écran de chargement */
       #loading-screen {
         position: fixed;
         inset: 0;
@@ -44,15 +48,10 @@
         align-items: center;
         justify-content: center;
         z-index: 9999;
-        transition: opacity 0.5s ease-out;
       }
-      
-      #loading-screen.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-      
-      .loading-spinner {
+      #loading-screen.hidden { display: none; }
+
+      .spinner {
         width: 48px;
         height: 48px;
         border: 4px solid rgba(220, 38, 38, 0.2);
@@ -60,45 +59,31 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
-      
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
+      @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
-    <div id="loading-screen">
-      <div class="loading-spinner"></div>
-    </div>
-    
+    <div id="loading-screen"><div class="spinner"></div></div>
     <div id="root"></div>
     
     <script type="module" src="/src/main.jsx"></script>
 
     <script>
-      window.addEventListener('load', function() {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-          setTimeout(function() {
-            loadingScreen.classList.add('hidden');
-          }, 500);
-        }
+      // Masquer le loader
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          document.getElementById('loading-screen').classList.add('hidden');
+        }, 500);
       });
-    </script>
-    
-    <script>
+
+      // Enregistrement Service Worker
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => {
-              console.log('✅ SOS Africa : Service Worker enregistré !');
-            })
-            .catch(err => {
-              console.log('❌ SOS Africa : Erreur Service Worker', err);
-            });
+            .then(() => console.log('✅ PWA Active'))
+            .catch(err => console.log('❌ Erreur SW', err));
         });
       }
     </script>
-
   </body>
 </html>

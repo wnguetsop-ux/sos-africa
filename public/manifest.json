@@ -1,15 +1,13 @@
 {
   "name": "SOS Africa - Sécurité Personnelle",
   "short_name": "SOS Africa",
-  "description": "Application de sécurité personnelle pour alerter vos proches en cas de danger.",
+  "description": "Application de sécurité personnelle.",
   "lang": "fr",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
-  "categories": ["utilities", "lifestyle", "safety"],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -22,13 +20,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Alerte SOS",
-      "short_name": "SOS",
-      "url": "/?action=sos"
     }
   ]
 }
