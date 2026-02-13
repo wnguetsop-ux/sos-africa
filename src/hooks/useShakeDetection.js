@@ -1,141 +1,132 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Motion } from '@capacitor/motion';
 
 /**
- * Hook de détection de secousse (Shake to Alert)
- * Détecte les mouvements violents pour déclencher une alerte
- * Optimisé pour économiser la batterie
+ * Hook pour détecter les secousses du téléphone (shake to alert)
+ * Déclenche le callback quand l'utilisateur secoue 3 fois en 2 secondes
  */
 export const useShakeDetection = (onShake, enabled = true) => {
-  const lastShakeTime = useRef(0);
   const shakeCount = useRef(0);
-  const lastAcceleration = useRef({ x: 0, y: 0, z: 0 });
-  const listenerRef = useRef(null);
-  
-  // Seuils de détection (calibrés pour une agression)
-  const SHAKE_THRESHOLD = 25; // Force minimale (m/s²)
-  const SHAKE_COUNT_THRESHOLD = 3; // Nombre de secousses pour déclencher
-  const SHAKE_RESET_TIME = 1500; // Reset après 1.5s sans mouvement
-  const COOLDOWN_TIME = 5000; // 5s entre deux alertes
+  const lastShake = useRef(0);
+  const lastX = useRef(0);
+  const lastY = useRef(0);
+  const lastZ = useRef(0);
+  const shakeTimeout = useRef(null);
 
   const handleMotion = useCallback((event) => {
     if (!enabled) return;
 
-    const now = Date.now();
-    
-    // Cooldown entre les alertes
-    if (now - lastShakeTime.current < COOLDOWN_TIME && shakeCount.current >= SHAKE_COUNT_THRESHOLD) {
-      return;
-    }
-
-    // Reset si trop de temps écoulé
-    if (now - lastShakeTime.current > SHAKE_RESET_TIME) {
-      shakeCount.current = 0;
-    }
-
-    // Calculer l'accélération totale (sans gravité si disponible)
-    let acceleration;
-    if (event.accelerationIncludingGravity) {
-      acceleration = event.accelerationIncludingGravity;
-    } else if (event.acceleration) {
-      acceleration = event.acceleration;
-    } else {
-      return;
-    }
+    const acceleration = event.accelerationIncludingGravity || event.acceleration;
+    if (!acceleration) return;
 
     const { x, y, z } = acceleration;
+    if (x === null || y === null || z === null) return;
+
+    // Calculer le changement d'accélération
+    const deltaX = Math.abs(x - lastX.current);
+    const deltaY = Math.abs(y - lastY.current);
+    const deltaZ = Math.abs(z - lastZ.current);
     
-    // Calculer le delta d'accélération
-    const deltaX = Math.abs(x - lastAcceleration.current.x);
-    const deltaY = Math.abs(y - lastAcceleration.current.y);
-    const deltaZ = Math.abs(z - lastAcceleration.current.z);
-    
-    const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+    // Sauvegarder les valeurs actuelles
+    lastX.current = x;
+    lastY.current = y;
+    lastZ.current = z;
 
-    // Mettre à jour la dernière accélération
-    lastAcceleration.current = { x, y, z };
+    // Détecter une secousse forte (seuil = 15)
+    const shakeThreshold = 15;
+    const totalDelta = deltaX + deltaY + deltaZ;
 
-    // Détecter une secousse
-    if (totalDelta > SHAKE_THRESHOLD) {
-      shakeCount.current += 1;
-      lastShakeTime.current = now;
-
-      // Vibration feedback pour chaque secousse détectée
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
+    if (totalDelta > shakeThreshold) {
+      const now = Date.now();
+      
+      // Si plus de 2 secondes depuis la dernière secousse, reset le compteur
+      if (now - lastShake.current > 2000) {
+        shakeCount.current = 0;
       }
 
-      // Déclencher l'alerte si seuil atteint
-      if (shakeCount.current >= SHAKE_COUNT_THRESHOLD) {
+      // Incrémenter le compteur de secousses
+      shakeCount.current++;
+      lastShake.current = now;
+
+      console.log(`🔔 Shake détecté! Count: ${shakeCount.current}/3`);
+
+      // Si 3 secousses en 2 secondes, déclencher l'alerte
+      if (shakeCount.current >= 3) {
+        console.log('🚨 SHAKE ALERT TRIGGERED!');
         shakeCount.current = 0;
         
-        // Vibration de confirmation
+        // Vibrer pour confirmer
         if (navigator.vibrate) {
-          navigator.vibrate([200, 100, 200]);
+          navigator.vibrate([100, 50, 100, 50, 200]);
         }
         
         onShake();
       }
+
+      // Reset le compteur après 2 secondes d'inactivité
+      if (shakeTimeout.current) {
+        clearTimeout(shakeTimeout.current);
+      }
+      shakeTimeout.current = setTimeout(() => {
+        shakeCount.current = 0;
+      }, 2000);
     }
-  }, [enabled, onShake]);
+  }, [onShake, enabled]);
 
   useEffect(() => {
-    if (!enabled) {
-      // Nettoyer le listener si désactivé
-      if (listenerRef.current) {
-        Motion.removeAllListeners();
-        listenerRef.current = null;
-      }
+    if (!enabled) return;
+
+    // Vérifier si l'API est disponible
+    if (typeof DeviceMotionEvent === 'undefined') {
+      console.log('DeviceMotion non supporté');
       return;
     }
 
-    const startListening = async () => {
-      try {
-        // Essayer d'utiliser l'API Capacitor Motion
-        if (Motion && Motion.addListener) {
-          listenerRef.current = await Motion.addListener('accel', (event) => {
-            handleMotion({
-              acceleration: event.acceleration,
-              accelerationIncludingGravity: event.accelerationIncludingGravity
-            });
-          });
-        }
-      } catch (err) {
-        console.log('Capacitor Motion non disponible, utilisation de l\'API Web');
-      }
-
-      // Fallback vers l'API Web DeviceMotion
-      if (window.DeviceMotionEvent) {
-        // Demander permission sur iOS 13+
-        if (typeof DeviceMotionEvent.requestPermission === 'function') {
-          try {
-            const permission = await DeviceMotionEvent.requestPermission();
-            if (permission === 'granted') {
-              window.addEventListener('devicemotion', handleMotion);
-            }
-          } catch (err) {
-            console.error('Permission acceleromètre refusée:', err);
+    // Pour iOS 13+, il faut demander la permission
+    const requestPermission = async () => {
+      if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const permission = await DeviceMotionEvent.requestPermission();
+          if (permission === 'granted') {
+            window.addEventListener('devicemotion', handleMotion, true);
+            console.log('✅ Shake detection activée (iOS)');
+          } else {
+            console.log('❌ Permission DeviceMotion refusée');
           }
-        } else {
-          // Android et anciens iOS
-          window.addEventListener('devicemotion', handleMotion);
+        } catch (error) {
+          console.log('Erreur permission:', error);
         }
+      } else {
+        // Android et autres
+        window.addEventListener('devicemotion', handleMotion, true);
+        console.log('✅ Shake detection activée (Android/Web)');
       }
     };
 
-    startListening();
+    requestPermission();
 
     return () => {
-      if (listenerRef.current) {
-        Motion.removeAllListeners();
+      window.removeEventListener('devicemotion', handleMotion, true);
+      if (shakeTimeout.current) {
+        clearTimeout(shakeTimeout.current);
       }
-      window.removeEventListener('devicemotion', handleMotion);
     };
-  }, [enabled, handleMotion]);
+  }, [handleMotion, enabled]);
 
-  return {
-    isSupported: window.DeviceMotionEvent !== undefined || (Motion && Motion.addListener)
+  // Fonction pour demander la permission manuellement (iOS)
+  const requestMotionPermission = async () => {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        const permission = await DeviceMotionEvent.requestPermission();
+        return permission === 'granted';
+      } catch (error) {
+        console.error('Erreur permission motion:', error);
+        return false;
+      }
+    }
+    return true; // Pas besoin de permission sur Android
   };
+
+  return { requestMotionPermission };
 };
 
 export default useShakeDetection;

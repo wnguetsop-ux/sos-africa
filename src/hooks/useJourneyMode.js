@@ -1,342 +1,210 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
- * Hook pour le mode accompagnement de trajet
- * Surveille un trajet de A à B et alerte si problème
+ * Hook pour le mode accompagnement (Journey Mode)
+ * Suit le trajet de l'utilisateur et envoie des alertes si nécessaire
  */
-export const useJourneyMode = (currentLocation, contacts, sendSMS) => {
+export const useJourneyMode = (location, contacts, sendSMS) => {
   const [isActive, setIsActive] = useState(false);
-  const [destination, setDestination] = useState(null);
-  const [destinationName, setDestinationName] = useState('');
-  const [startLocation, setStartLocation] = useState(null);
-  const [estimatedDuration, setEstimatedDuration] = useState(30); // minutes
+  const [destination, setDestination] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState(30); // minutes
+  const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [checkInInterval, setCheckInInterval] = useState(10); // minutes
   const [lastCheckIn, setLastCheckIn] = useState(null);
-  const [isOverdue, setIsOverdue] = useState(false);
-  const [guardianPhone, setGuardianPhone] = useState('');
-  const [guardianName, setGuardianName] = useState('');
-  const [journeyHistory, setJourneyHistory] = useState([]);
-  const [status, setStatus] = useState('idle'); // idle, active, paused, arrived, alert
+  const [path, setPath] = useState([]);
+  const [status, setStatus] = useState('idle'); // idle, active, warning, alert
+  const [selectedContact, setSelectedContact] = useState(null);
   
   const timerRef = useRef(null);
-  const alertTimeoutRef = useRef(null);
-  const checkInTimeoutRef = useRef(null);
+  const checkInRef = useRef(null);
+  const warningRef = useRef(null);
 
-  // Charger l'historique
-  useEffect(() => {
-    const stored = localStorage.getItem('sos_journey_history');
-    if (stored) {
-      setJourneyHistory(JSON.parse(stored));
+  // Démarrer le trajet
+  const startJourney = useCallback((dest, minutes, contact) => {
+    if (!dest || minutes <= 0) {
+      alert('Veuillez entrer une destination et une durée valide');
+      return false;
     }
-  }, []);
 
-  // Timer principal
-  useEffect(() => {
-    if (isActive && status === 'active') {
-      timerRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
-      }, 60000); // Toutes les minutes
-      
-      return () => clearInterval(timerRef.current);
-    }
-  }, [isActive, status]);
-
-  // Vérification du temps écoulé
-  useEffect(() => {
-    if (isActive && elapsedTime > estimatedDuration) {
-      setIsOverdue(true);
-      // Déclencher alerte automatique après 5 min de retard
-      alertTimeoutRef.current = setTimeout(() => {
-        if (status === 'active') {
-          triggerJourneyAlert('timeout');
-        }
-      }, 5 * 60 * 1000);
-    }
+    console.log('🚗 Démarrage du trajet vers:', dest, 'Durée:', minutes, 'min');
     
-    return () => clearTimeout(alertTimeoutRef.current);
-  }, [elapsedTime, estimatedDuration, isActive, status]);
-
-  // Démarrer un trajet
-  const startJourney = useCallback((config) => {
-    const {
-      destination: dest,
-      destinationName: destName,
-      duration,
-      guardian,
-      guardianName: gName,
-      checkInterval
-    } = config;
-
     setDestination(dest);
-    setDestinationName(destName || 'Destination');
-    setStartLocation(currentLocation);
-    setEstimatedDuration(duration || 30);
-    setGuardianPhone(guardian);
-    setGuardianName(gName || 'Gardien');
-    setCheckInInterval(checkInterval || 10);
+    setEstimatedTime(minutes);
+    setSelectedContact(contact || (contacts.length > 0 ? contacts[0] : null));
+    setStartTime(Date.now());
     setElapsedTime(0);
     setLastCheckIn(Date.now());
-    setIsOverdue(false);
+    setPath(location ? [{ ...location, timestamp: Date.now() }] : []);
     setIsActive(true);
     setStatus('active');
 
-    // Notifier le gardien du départ
-    const startMessage = `🚶 TRAJET DÉMARRÉ - SOS Africa
-
-👤 Je pars maintenant vers: ${destName || 'ma destination'}
-⏱️ Durée estimée: ${duration || 30} minutes
-📍 Position de départ: ${currentLocation ? `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}` : 'Non disponible'}
-⏰ Heure de départ: ${new Date().toLocaleTimeString('fr-FR')}
-
-Je vous préviendrai de mon arrivée. Si vous ne recevez pas de nouvelles dans ${(duration || 30) + 10} minutes, essayez de me contacter.`;
-
-    if (guardian) {
-      sendNotificationToGuardian(guardian, startMessage);
-    }
-
-    // Programmer les check-ins
-    scheduleCheckIn(checkInterval || 10);
-
-    // Sauvegarder dans l'historique
-    const journey = {
-      id: Date.now(),
-      startTime: new Date().toISOString(),
-      startLocation: currentLocation,
-      destination: dest,
-      destinationName: destName,
-      estimatedDuration: duration,
-      guardian,
-      status: 'active'
-    };
-    
-    const updatedHistory = [journey, ...journeyHistory].slice(0, 20);
-    setJourneyHistory(updatedHistory);
-    localStorage.setItem('sos_journey_history', JSON.stringify(updatedHistory));
-
-    // Vibration de confirmation
+    // Vibrer pour confirmer
     if (navigator.vibrate) {
-      navigator.vibrate([200, 100, 200]);
+      navigator.vibrate([100, 50, 100]);
     }
 
-  }, [currentLocation, journeyHistory]);
+    // Envoyer notification de départ au contact
+    if (contact && location) {
+      const message = `🚗 SOS Africa: ${contact.name || 'Votre contact'} a démarré un trajet vers "${dest}". Durée estimée: ${minutes} min. Position de départ: https://maps.google.com/?q=${location.lat},${location.lng}`;
+      
+      // Essayer d'envoyer via SMS natif
+      const smsLink = `sms:${contact.phone}?body=${encodeURIComponent(message)}`;
+      window.open(smsLink, '_blank');
+    }
 
-  // Programmer un check-in
-  const scheduleCheckIn = (minutes) => {
-    clearTimeout(checkInTimeoutRef.current);
-    checkInTimeoutRef.current = setTimeout(() => {
-      // Demander un check-in
-      if (navigator.vibrate) {
-        navigator.vibrate([500, 200, 500, 200, 500]);
-      }
-      // L'utilisateur a 2 minutes pour confirmer
-      setStatus('waiting_checkin');
-    }, minutes * 60 * 1000);
-  };
+    return true;
+  }, [contacts, location]);
 
-  // Confirmer un check-in
-  const confirmCheckIn = useCallback(() => {
+  // Arrêter le trajet
+  const stopJourney = useCallback((notifyContact = true) => {
+    console.log('⏹️ Arrêt du trajet');
+    
+    // Nettoyer les timers
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (checkInRef.current) clearInterval(checkInRef.current);
+    if (warningRef.current) clearTimeout(warningRef.current);
+
+    // Notifier le contact que le trajet est terminé
+    if (notifyContact && selectedContact && isActive) {
+      const message = `✅ SOS Africa: Trajet terminé en sécurité! Destination "${destination}" atteinte.`;
+      const smsLink = `sms:${selectedContact.phone}?body=${encodeURIComponent(message)}`;
+      window.open(smsLink, '_blank');
+    }
+
+    // Reset l'état
+    setIsActive(false);
+    setStatus('idle');
+    setDestination('');
+    setStartTime(null);
+    setElapsedTime(0);
+    setPath([]);
+    
+    if (navigator.vibrate) {
+      navigator.vibrate(200);
+    }
+  }, [selectedContact, destination, isActive]);
+
+  // Check-in manuel (je suis ok)
+  const checkIn = useCallback(() => {
+    console.log('✅ Check-in effectué');
     setLastCheckIn(Date.now());
     setStatus('active');
     
-    // Notifier le gardien (optionnel, peut être désactivé)
-    const checkInMessage = `✅ CHECK-IN - SOS Africa
-
-👤 Je vais bien!
-📍 Position actuelle: ${currentLocation ? `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}` : 'Non disponible'}
-⏱️ Temps écoulé: ${elapsedTime} min / ${estimatedDuration} min`;
-
-    if (guardianPhone && elapsedTime > 0) {
-      // sendNotificationToGuardian(guardianPhone, checkInMessage);
-    }
-
-    // Programmer le prochain check-in
-    scheduleCheckIn(checkInInterval);
-
     if (navigator.vibrate) {
       navigator.vibrate(100);
     }
-  }, [currentLocation, elapsedTime, estimatedDuration, checkInInterval, guardianPhone]);
 
-  // Confirmer l'arrivée
-  const confirmArrival = useCallback(() => {
-    setStatus('arrived');
-    setIsActive(false);
-    clearTimeout(timerRef.current);
-    clearTimeout(checkInTimeoutRef.current);
-    clearTimeout(alertTimeoutRef.current);
+    return true;
+  }, []);
 
-    const arrivalMessage = `🎉 ARRIVÉE CONFIRMÉE - SOS Africa
+  // Déclencher une alerte manuelle
+  const triggerAlert = useCallback(() => {
+    if (!selectedContact || !location) return;
 
-✅ Je suis bien arrivé(e) à destination!
-📍 ${destinationName}
-⏱️ Durée du trajet: ${elapsedTime} minutes
-⏰ Heure d'arrivée: ${new Date().toLocaleTimeString('fr-FR')}
-
-Merci de m'avoir accompagné(e)! 🙏`;
-
-    if (guardianPhone) {
-      sendNotificationToGuardian(guardianPhone, arrivalMessage);
-    }
-
-    // Mettre à jour l'historique
-    updateJourneyInHistory('arrived');
-
-    if (navigator.vibrate) {
-      navigator.vibrate([100, 50, 100, 50, 300]);
-    }
-  }, [destinationName, elapsedTime, guardianPhone]);
-
-  // Déclencher une alerte trajet
-  const triggerJourneyAlert = useCallback((reason = 'manual') => {
+    console.log('🚨 Alerte trajet déclenchée!');
     setStatus('alert');
-    clearTimeout(checkInTimeoutRef.current);
 
-    let alertReason = '';
-    switch (reason) {
-      case 'timeout':
-        alertReason = '⏰ RETARD SIGNIFICATIF';
-        break;
-      case 'no_checkin':
-        alertReason = '❌ PAS DE CHECK-IN';
-        break;
-      case 'manual':
-        alertReason = '🆘 ALERTE MANUELLE';
-        break;
-      case 'sos':
-        alertReason = '🚨 SOS DÉCLENCHÉ';
-        break;
-      default:
-        alertReason = '⚠️ PROBLÈME DÉTECTÉ';
-    }
+    const message = `🚨 ALERTE SOS Africa!\n\nProblème pendant le trajet vers "${destination}".\n\nPosition actuelle:\nhttps://maps.google.com/?q=${location.lat},${location.lng}\n\nContactez-moi immédiatement!`;
+    
+    const smsLink = `sms:${selectedContact.phone}?body=${encodeURIComponent(message)}`;
+    window.open(smsLink, '_blank');
 
-    const alertMessage = `🚨 ALERTE TRAJET - SOS Africa
-
-${alertReason}
-
-👤 Personne: En trajet vers ${destinationName}
-📍 Dernière position connue: ${currentLocation ? `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}` : 'Non disponible'}
-⏱️ Temps écoulé: ${elapsedTime} min (estimé: ${estimatedDuration} min)
-⏰ Dernier check-in: ${lastCheckIn ? new Date(lastCheckIn).toLocaleTimeString('fr-FR') : 'Aucun'}
-
-VEUILLEZ CONTACTER CETTE PERSONNE IMMÉDIATEMENT!`;
-
-    // Envoyer au gardien
-    if (guardianPhone) {
-      sendNotificationToGuardian(guardianPhone, alertMessage);
-    }
-
-    // Envoyer à tous les contacts d'urgence
-    if (contacts && contacts.length > 0) {
-      sendSMS(contacts, alertMessage);
-    }
-
-    // Mettre à jour l'historique
-    updateJourneyInHistory('alert');
-
-    // Vibration d'urgence
     if (navigator.vibrate) {
-      navigator.vibrate([1000, 500, 1000, 500, 1000]);
+      navigator.vibrate([500, 200, 500, 200, 500]);
     }
-  }, [currentLocation, destinationName, elapsedTime, estimatedDuration, lastCheckIn, guardianPhone, contacts, sendSMS]);
+  }, [selectedContact, destination, location]);
 
-  // Annuler le trajet
-  const cancelJourney = useCallback(() => {
-    setIsActive(false);
-    setStatus('idle');
-    clearTimeout(timerRef.current);
-    clearTimeout(checkInTimeoutRef.current);
-    clearTimeout(alertTimeoutRef.current);
+  // Prolonger le trajet
+  const extendTime = useCallback((additionalMinutes) => {
+    setEstimatedTime(prev => prev + additionalMinutes);
+    setStatus('active');
+    console.log(`⏰ Trajet prolongé de ${additionalMinutes} minutes`);
+  }, []);
 
-    if (guardianPhone && elapsedTime > 0) {
-      const cancelMessage = `❌ TRAJET ANNULÉ - SOS Africa
+  // Mettre à jour le timer et la position
+  useEffect(() => {
+    if (!isActive) return;
 
-Le trajet vers ${destinationName} a été annulé.
-⏰ Heure: ${new Date().toLocaleTimeString('fr-FR')}`;
+    // Timer pour le temps écoulé
+    timerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 60000); // en minutes
+      setElapsedTime(elapsed);
+
+      // Vérifier si le temps estimé est dépassé
+      if (elapsed >= estimatedTime && status !== 'alert') {
+        setStatus('warning');
+        
+        // Vibrer pour avertir
+        if (navigator.vibrate) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      }
+
+      // Si 5 minutes de plus que prévu, alerte automatique
+      if (elapsed >= estimatedTime + 5 && status !== 'alert') {
+        triggerAlert();
+      }
+    }, 30000); // Vérifier toutes les 30 secondes
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isActive, startTime, estimatedTime, status, triggerAlert]);
+
+  // Mettre à jour le chemin avec les nouvelles positions
+  useEffect(() => {
+    if (!isActive || !location) return;
+
+    setPath(prev => {
+      const lastPoint = prev[prev.length - 1];
       
-      sendNotificationToGuardian(guardianPhone, cancelMessage);
-    }
-
-    updateJourneyInHistory('cancelled');
-
-  }, [guardianPhone, destinationName, elapsedTime]);
-
-  // Mettre à jour l'historique
-  const updateJourneyInHistory = (newStatus) => {
-    const updatedHistory = journeyHistory.map((j, index) => {
-      if (index === 0 && j.status === 'active') {
-        return {
-          ...j,
-          status: newStatus,
-          endTime: new Date().toISOString(),
-          actualDuration: elapsedTime
-        };
+      // N'ajouter que si la position a significativement changé
+      if (lastPoint) {
+        const distance = Math.sqrt(
+          Math.pow(location.lat - lastPoint.lat, 2) + 
+          Math.pow(location.lng - lastPoint.lng, 2)
+        );
+        
+        if (distance < 0.0001) return prev; // ~10 mètres
       }
-      return j;
+
+      return [...prev, { ...location, timestamp: Date.now() }];
     });
-    setJourneyHistory(updatedHistory);
-    localStorage.setItem('sos_journey_history', JSON.stringify(updatedHistory));
-  };
+  }, [isActive, location]);
 
-  // Envoyer notification au gardien
-  const sendNotificationToGuardian = async (phone, message) => {
-    try {
-      // Essayer SMS natif d'abord
-      if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-        const { Sms } = await import('@byteowls/capacitor-sms');
-        await Sms.send({
-          numbers: [phone],
-          text: message
-        });
-      } else {
-        // Fallback: ouvrir l'app SMS
-        const encoded = encodeURIComponent(message);
-        const userAgent = navigator.userAgent || '';
-        const separator = /android/i.test(userAgent) ? '?' : '&';
-        window.open(`sms:${phone}${separator}body=${encoded}`, '_blank');
-      }
-    } catch (err) {
-      console.error('Erreur envoi notification gardien:', err);
-    }
-  };
-
-  // Formater le temps
-  const formatTime = (minutes) => {
-    const hrs = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hrs > 0) {
-      return `${hrs}h ${mins}min`;
-    }
-    return `${mins} min`;
-  };
+  // Calculer les statistiques du trajet
+  const getStats = useCallback(() => {
+    const remainingTime = Math.max(0, estimatedTime - elapsedTime);
+    const progress = Math.min(100, (elapsedTime / estimatedTime) * 100);
+    
+    return {
+      elapsedTime,
+      remainingTime,
+      progress,
+      pointsCount: path.length,
+      isOvertime: elapsedTime > estimatedTime
+    };
+  }, [elapsedTime, estimatedTime, path]);
 
   return {
-    // État
     isActive,
-    status,
     destination,
-    destinationName,
-    startLocation,
-    estimatedDuration,
+    estimatedTime,
     elapsedTime,
-    formattedElapsed: formatTime(elapsedTime),
-    formattedEstimated: formatTime(estimatedDuration),
-    isOverdue,
-    lastCheckIn,
-    guardianName,
-    journeyHistory,
-    
-    // Actions
+    status,
+    path,
+    selectedContact,
     startJourney,
-    confirmCheckIn,
-    confirmArrival,
-    triggerJourneyAlert,
-    cancelJourney,
-    setEstimatedDuration,
+    stopJourney,
+    checkIn,
+    triggerAlert,
+    extendTime,
+    setDestination,
+    setEstimatedTime,
     setCheckInInterval,
-    
-    // Utilitaires
-    formatTime
+    setSelectedContact,
+    getStats
   };
 };
 

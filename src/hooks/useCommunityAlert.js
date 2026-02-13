@@ -2,337 +2,184 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Hook pour les alertes communautaires
- * Permet de notifier les utilisateurs SOS Africa à proximité
- * Note: Nécessite un backend pour fonctionner pleinement
- * Cette version simule le comportement et prépare l'intégration
+ * Permet de voir et signaler des dangers dans la zone
  */
-export const useCommunityAlert = (currentLocation) => {
-  const [isEnabled, setIsEnabled] = useState(false);
-  const [nearbyUsers, setNearbyUsers] = useState([]);
-  const [alertRadius, setAlertRadius] = useState(500); // mètres
-  const [incomingAlerts, setIncomingAlerts] = useState([]);
+export const useCommunityAlert = (location) => {
+  const [alerts, setAlerts] = useState([]);
+  const [nearbyUsers, setNearbyUsers] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [myAlertActive, setMyAlertActive] = useState(false);
-  const [respondedAlerts, setRespondedAlerts] = useState([]);
-  
-  const wsRef = useRef(null);
-  const locationUpdateRef = useRef(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
-  // Charger les préférences
-  useEffect(() => {
-    const stored = localStorage.getItem('sos_community_settings');
-    if (stored) {
-      const settings = JSON.parse(stored);
-      setIsEnabled(settings.isEnabled ?? false);
-      setAlertRadius(settings.alertRadius ?? 500);
-    }
-  }, []);
+  // Types d'alertes
+  const alertTypes = [
+    { id: 'danger', label: 'Zone dangereuse', icon: '⚠️', color: 'red' },
+    { id: 'accident', label: 'Accident', icon: '🚗', color: 'orange' },
+    { id: 'theft', label: 'Vol signalé', icon: '🚨', color: 'red' },
+    { id: 'harassment', label: 'Harcèlement', icon: '🛑', color: 'purple' },
+    { id: 'police', label: 'Contrôle police', icon: '👮', color: 'blue' },
+    { id: 'fire', label: 'Incendie', icon: '🔥', color: 'orange' },
+    { id: 'flood', label: 'Inondation', icon: '🌊', color: 'blue' },
+    { id: 'other', label: 'Autre danger', icon: '❗', color: 'gray' },
+  ];
 
-  // Sauvegarder les préférences
-  const saveSettings = (settings) => {
-    localStorage.setItem('sos_community_settings', JSON.stringify(settings));
-  };
+  // Charger les alertes locales (simulé - en production, utiliser une API)
+  const loadAlerts = useCallback(async () => {
+    if (!location?.lat || !location?.lng) return;
 
-  // Activer/désactiver le mode communautaire
-  const toggleCommunityMode = useCallback((enabled) => {
-    setIsEnabled(enabled);
-    saveSettings({ isEnabled: enabled, alertRadius });
-    
-    if (enabled) {
-      connectToNetwork();
-    } else {
-      disconnectFromNetwork();
-    }
-  }, [alertRadius]);
+    setIsLoading(true);
 
-  // Modifier le rayon d'alerte
-  const updateAlertRadius = useCallback((radius) => {
-    setAlertRadius(radius);
-    saveSettings({ isEnabled, alertRadius: radius });
-  }, [isEnabled]);
-
-  // Se connecter au réseau communautaire (simulé)
-  const connectToNetwork = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Simulation: Dans une vraie app, on se connecterait à un WebSocket
-      // ws://api.sosafrika.com/community
-      
-      // Générer un ID utilisateur anonyme
-      let userId = localStorage.getItem('sos_user_id');
-      if (!userId) {
-        userId = 'user_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('sos_user_id', userId);
-      }
+      // Charger depuis localStorage (simulation)
+      const stored = localStorage.getItem('sos_community_alerts');
+      let allAlerts = stored ? JSON.parse(stored) : [];
 
-      // Simuler la connexion
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Simuler des utilisateurs à proximité (pour la démo)
-      simulateNearbyUsers();
-      
-      // Démarrer les mises à jour de position
-      startLocationUpdates();
-      
-      setIsLoading(false);
-      
-      if (navigator.vibrate) {
-        navigator.vibrate(100);
-      }
-      
-    } catch (err) {
-      console.error('Erreur connexion réseau communautaire:', err);
-      setError('Impossible de se connecter au réseau');
-      setIsLoading(false);
-    }
-  }, [currentLocation]);
+      // Filtrer les alertes expirées (plus de 24h)
+      const now = Date.now();
+      allAlerts = allAlerts.filter(a => now - a.timestamp < 24 * 60 * 60 * 1000);
 
-  // Se déconnecter du réseau
-  const disconnectFromNetwork = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    
-    clearInterval(locationUpdateRef.current);
-    setNearbyUsers([]);
-    setIncomingAlerts([]);
-  }, []);
-
-  // Simuler des utilisateurs à proximité (pour la démo)
-  const simulateNearbyUsers = () => {
-    if (!currentLocation) return;
-    
-    // Générer quelques utilisateurs fictifs dans le rayon
-    const fakeUsers = [];
-    const numUsers = Math.floor(Math.random() * 5) + 1;
-    
-    for (let i = 0; i < numUsers; i++) {
-      const offsetLat = (Math.random() - 0.5) * 0.01; // ~500m
-      const offsetLng = (Math.random() - 0.5) * 0.01;
-      
-      fakeUsers.push({
-        id: 'user_' + Math.random().toString(36).substr(2, 6),
-        lat: currentLocation.lat + offsetLat,
-        lng: currentLocation.lng + offsetLng,
-        distance: Math.floor(Math.random() * alertRadius),
-        lastSeen: Date.now() - Math.floor(Math.random() * 300000) // Dans les 5 dernières minutes
+      // Filtrer les alertes proches (rayon de 5km)
+      const nearbyAlerts = allAlerts.filter(alert => {
+        const distance = calculateDistance(
+          location.lat, location.lng,
+          alert.lat, alert.lng
+        );
+        return distance <= 5; // 5km
       });
+
+      setAlerts(nearbyAlerts);
+      setNearbyUsers(Math.floor(Math.random() * 15) + 5); // Simulé
+      setLastUpdate(new Date());
+
+      // Sauvegarder les alertes nettoyées
+      localStorage.setItem('sos_community_alerts', JSON.stringify(allAlerts));
+
+    } catch (error) {
+      console.error('Erreur chargement alertes:', error);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setNearbyUsers(fakeUsers);
-  };
+  }, [location]);
 
-  // Démarrer les mises à jour de position
-  const startLocationUpdates = () => {
-    locationUpdateRef.current = setInterval(() => {
-      // Mettre à jour la position sur le serveur
-      updateMyLocation();
-      // Rafraîchir les utilisateurs proches
-      simulateNearbyUsers();
-    }, 30000); // Toutes les 30 secondes
-  };
-
-  // Mettre à jour ma position
-  const updateMyLocation = async () => {
-    if (!currentLocation || !isEnabled) return;
-    
-    // Dans une vraie app, envoyer au serveur
-    console.log('Position mise à jour:', currentLocation);
-  };
-
-  // Envoyer une alerte communautaire
-  const sendCommunityAlert = useCallback(async (alertData = {}) => {
-    if (!isEnabled || !currentLocation) {
-      setError('Mode communautaire non actif');
-      return false;
-    }
-
-    try {
-      setMyAlertActive(true);
-      
-      const alert = {
-        id: 'alert_' + Date.now(),
-        senderId: localStorage.getItem('sos_user_id'),
-        type: alertData.type || 'sos',
-        message: alertData.message || 'Besoin d\'aide!',
-        location: currentLocation,
-        timestamp: Date.now(),
-        radius: alertRadius,
-        severity: alertData.severity || 'high' // low, medium, high, critical
-      };
-
-      // Simuler l'envoi (dans une vraie app, envoyer au serveur)
-      console.log('Alerte communautaire envoyée:', alert);
-      
-      // Vibration d'alerte
-      if (navigator.vibrate) {
-        navigator.vibrate([500, 200, 500, 200, 500]);
-      }
-
-      // Notification locale
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Alerte SOS envoyée!', {
-          body: `${nearbyUsers.length} personne(s) à proximité notifiée(s)`,
-          icon: '/icons/icon-192x192.png',
-          tag: 'sos-sent'
-        });
-      }
-
-      // L'alerte reste active pendant 10 minutes
-      setTimeout(() => {
-        setMyAlertActive(false);
-      }, 10 * 60 * 1000);
-
-      return true;
-      
-    } catch (err) {
-      console.error('Erreur envoi alerte communautaire:', err);
-      setError('Impossible d\'envoyer l\'alerte');
-      return false;
-    }
-  }, [isEnabled, currentLocation, alertRadius, nearbyUsers]);
-
-  // Annuler mon alerte
-  const cancelMyAlert = useCallback(() => {
-    setMyAlertActive(false);
-    // Notifier le serveur
-    console.log('Alerte annulée');
-  }, []);
-
-  // Répondre à une alerte entrante
-  const respondToAlert = useCallback(async (alertId, response) => {
-    const alert = incomingAlerts.find(a => a.id === alertId);
-    if (!alert) return;
-
-    try {
-      const responseData = {
-        alertId,
-        responderId: localStorage.getItem('sos_user_id'),
-        response: response, // 'coming', 'calling_help', 'cannot_help'
-        myLocation: currentLocation,
-        timestamp: Date.now()
-      };
-
-      // Simuler l'envoi de la réponse
-      console.log('Réponse à l\'alerte:', responseData);
-      
-      // Marquer comme répondu
-      setRespondedAlerts(prev => [...prev, alertId]);
-      
-      // Retirer de la liste des alertes actives
-      setTimeout(() => {
-        setIncomingAlerts(prev => prev.filter(a => a.id !== alertId));
-      }, 2000);
-
-      if (navigator.vibrate) {
-        navigator.vibrate([100, 50, 100]);
-      }
-
-      return true;
-      
-    } catch (err) {
-      console.error('Erreur réponse alerte:', err);
-      return false;
-    }
-  }, [currentLocation, incomingAlerts]);
-
-  // Ignorer une alerte
-  const dismissAlert = useCallback((alertId) => {
-    setIncomingAlerts(prev => prev.filter(a => a.id !== alertId));
-  }, []);
-
-  // Calculer la distance entre deux points
+  // Calculer la distance entre deux points GPS (en km)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3; // Rayon de la Terre en mètres
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-    return Math.round(R * c); // Distance en mètres
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   };
 
-  // Simuler une alerte entrante (pour les tests)
-  const simulateIncomingAlert = useCallback(() => {
-    if (!currentLocation) return;
-    
-    const fakeAlert = {
+  // Signaler une nouvelle alerte
+  const reportAlert = useCallback((type, description = '') => {
+    if (!location?.lat || !location?.lng) {
+      alert('Position GPS requise pour signaler un danger');
+      return false;
+    }
+
+    const alertType = alertTypes.find(t => t.id === type) || alertTypes[7];
+
+    const newAlert = {
       id: 'alert_' + Date.now(),
-      senderId: 'user_' + Math.random().toString(36).substr(2, 6),
-      type: 'sos',
-      message: 'Besoin d\'aide urgente!',
-      location: {
-        lat: currentLocation.lat + (Math.random() - 0.5) * 0.005,
-        lng: currentLocation.lng + (Math.random() - 0.5) * 0.005
-      },
+      type: type,
+      label: alertType.label,
+      icon: alertType.icon,
+      color: alertType.color,
+      description: description,
+      lat: location.lat,
+      lng: location.lng,
       timestamp: Date.now(),
-      distance: Math.floor(Math.random() * alertRadius)
+      reportedBy: 'anonymous',
+      confirmations: 1
     };
-    
-    setIncomingAlerts(prev => [fakeAlert, ...prev]);
-    
-    // Vibration et notification
+
+    // Sauvegarder
+    const stored = localStorage.getItem('sos_community_alerts');
+    const allAlerts = stored ? JSON.parse(stored) : [];
+    allAlerts.push(newAlert);
+    localStorage.setItem('sos_community_alerts', JSON.stringify(allAlerts));
+
+    // Mettre à jour l'état local
+    setAlerts(prev => [newAlert, ...prev]);
+
+    // Vibrer pour confirmer
     if (navigator.vibrate) {
-      navigator.vibrate([1000, 500, 1000]);
+      navigator.vibrate([100, 50, 100]);
     }
+
+    console.log('🚨 Alerte signalée:', newAlert);
+    return true;
+  }, [location, alertTypes]);
+
+  // Confirmer une alerte existante
+  const confirmAlert = useCallback((alertId) => {
+    const stored = localStorage.getItem('sos_community_alerts');
+    if (!stored) return;
+
+    const allAlerts = JSON.parse(stored);
+    const alertIndex = allAlerts.findIndex(a => a.id === alertId);
     
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('🆘 Alerte SOS à proximité!', {
-        body: `Quelqu'un a besoin d'aide à ${fakeAlert.distance}m`,
-        icon: '/icons/icon-192x192.png',
-        tag: 'sos-incoming',
-        requireInteraction: true
-      });
-    }
-  }, [currentLocation, alertRadius]);
+    if (alertIndex !== -1) {
+      allAlerts[alertIndex].confirmations++;
+      localStorage.setItem('sos_community_alerts', JSON.stringify(allAlerts));
+      
+      setAlerts(prev => prev.map(a => 
+        a.id === alertId 
+          ? { ...a, confirmations: a.confirmations + 1 }
+          : a
+      ));
 
-  // Demander la permission de notification
-  const requestNotificationPermission = async () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      await Notification.requestPermission();
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
     }
-  };
+  }, []);
 
-  // Cleanup
+  // Supprimer une alerte (signaler comme fausse)
+  const dismissAlert = useCallback((alertId) => {
+    const stored = localStorage.getItem('sos_community_alerts');
+    if (!stored) return;
+
+    const allAlerts = JSON.parse(stored).filter(a => a.id !== alertId);
+    localStorage.setItem('sos_community_alerts', JSON.stringify(allAlerts));
+    
+    setAlerts(prev => prev.filter(a => a.id !== alertId));
+  }, []);
+
+  // Obtenir les alertes par type
+  const getAlertsByType = useCallback((type) => {
+    return alerts.filter(a => a.type === type);
+  }, [alerts]);
+
+  // Obtenir le nombre d'alertes actives
+  const getActiveCount = useCallback(() => {
+    return alerts.length;
+  }, [alerts]);
+
+  // Charger les alertes au montage et quand la position change
   useEffect(() => {
-    return () => {
-      disconnectFromNetwork();
-    };
-  }, [disconnectFromNetwork]);
+    loadAlerts();
+  }, [loadAlerts]);
+
+  // Rafraîchir automatiquement toutes les 5 minutes
+  useEffect(() => {
+    const interval = setInterval(loadAlerts, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [loadAlerts]);
 
   return {
-    // État
-    isEnabled,
+    alerts,
     nearbyUsers,
-    nearbyCount: nearbyUsers.length,
-    alertRadius,
-    incomingAlerts,
     isLoading,
-    error,
-    myAlertActive,
-    respondedAlerts,
-    
-    // Actions
-    toggleCommunityMode,
-    updateAlertRadius,
-    sendCommunityAlert,
-    cancelMyAlert,
-    respondToAlert,
+    lastUpdate,
+    alertTypes,
+    reportAlert,
+    confirmAlert,
     dismissAlert,
-    requestNotificationPermission,
-    
-    // Debug/Test
-    simulateIncomingAlert,
-    calculateDistance
+    loadAlerts,
+    getAlertsByType,
+    getActiveCount
   };
 };
 
