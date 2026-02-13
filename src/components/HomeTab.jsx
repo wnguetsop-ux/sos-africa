@@ -96,7 +96,7 @@ const HomeTab = ({ location, gpsLoading, gpsError, refreshGPS, contacts, isOnlin
   const textSecondary = isDark ? 'text-slate-400' : 'text-slate-600';
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 pb-28">
       {/* Carte dynamique selon la position */}
       <div className="relative rounded-2xl overflow-hidden h-44">
         <div className="absolute inset-0 bg-cover bg-center transition-all duration-700" style={{ backgroundImage: `url('${currentCity.image}')`, filter: 'brightness(0.4)' }} />

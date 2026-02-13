@@ -325,9 +325,9 @@ const App = () => {
   ];
 
   return (
-    <div className={`min-h-screen ${colors.bg} ${colors.text} flex flex-col safe-area-inset`}>
-      {/* Header */}
-      <header className={`${colors.bgSecondary} border-b ${colors.border} px-4 py-3 flex items-center justify-between`}>
+    <div className={`h-screen ${colors.bg} ${colors.text} flex flex-col overflow-hidden`}>
+      {/* Header - FIXE */}
+      <header className={`${colors.bgSecondary} border-b ${colors.border} px-4 py-3 flex items-center justify-between flex-shrink-0`}>
         <div 
           className="flex items-center gap-2 cursor-pointer"
           onClick={() => setAdminTapCount(prev => prev + 1)}
@@ -357,16 +357,16 @@ const App = () => {
         </div>
       </header>
 
-      {/* Bandeau gratuit */}
-      <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border-b border-green-600/30 px-4 py-2 flex items-center justify-center gap-2">
+      {/* Bandeau gratuit - FIXE */}
+      <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border-b border-green-600/30 px-4 py-2 flex items-center justify-center gap-2 flex-shrink-0">
         <span className="text-xl">🎉</span>
         <span className="text-green-300 text-sm font-medium">
           {language === 'fr' ? '100% Gratuit - Toutes fonctionnalités!' : '100% Free - All features!'}
         </span>
       </div>
 
-      {/* Contenu principal */}
-      <main className="flex-1 overflow-y-auto pb-24">
+      {/* Contenu principal - SCROLLABLE */}
+      <main className="flex-1 overflow-y-auto pb-24 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
         {activeTab === 'home' && (
           <HomeTab 
             location={location}
@@ -434,8 +434,8 @@ const App = () => {
         )}
       </main>
 
-      {/* Navigation inférieure */}
-      <nav className={`fixed bottom-0 left-0 right-0 ${colors.bgSecondary} border-t ${colors.border} px-2 py-2 safe-area-bottom`}>
+      {/* Navigation inférieure - FIXE */}
+      <nav className={`fixed bottom-0 left-0 right-0 ${colors.bgSecondary} border-t ${colors.border} px-2 py-2 z-40`}>
         <div className="flex justify-around items-center max-w-lg mx-auto">
           {tabs.map((tab) => (
             <button 
