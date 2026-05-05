@@ -3,3 +3,5 @@ dist/
 .env
 android/
 capacitor.config.ts
+.claude/
+.vercel/

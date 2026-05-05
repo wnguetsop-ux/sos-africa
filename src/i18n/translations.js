@@ -4,8 +4,10 @@ export const translations = {
     // Navigation
     nav: {
       home: 'Accueil',
-      location: 'Position',
-      tools: 'Outils',
+      location: 'Carte',
+      tools: 'Alertes',
+      contacts: 'Contacts',
+      profile: 'Profil',
       settings: 'Réglages'
     },
     
@@ -38,8 +40,27 @@ export const translations = {
       journeyInProgress: 'Trajet en cours',
       recording: 'Enregistrement',
       estimatedPosition: 'Position estimée',
-      gpsActive: 'GPS Actif',
-      searching: 'Recherche...'
+      gpsActive: 'Active',
+      searching: 'Recherche...',
+      // Refonte design premium
+      helloUser: 'Salut',
+      protectedStatus: 'Vous êtes protégé',
+      silentSOS: 'SOS silencieux',
+      shakeOn: 'Secousse ON',
+      shakeOff: 'Secousse OFF',
+      quickActions: 'Actions rapides',
+      shareLocation: 'Partager position',
+      realtime: 'En temps réel',
+      aiAssistant: 'Assistant IA',
+      smartHelp: 'Aide intelligente',
+      followed: 'Je me sens suivi',
+      discreetAlert: 'Alerte discrète',
+      systemStatus: 'Statut du système',
+      allActive: 'Tout est actif',
+      contactsLabel: "Contacts d'urgence",
+      contactsReady: 'prêts',
+      contactsAddRequired: 'À ajouter',
+      connection: 'Connexion'
     },
     
     // Location tab
@@ -60,7 +81,22 @@ export const translations = {
       firemen: 'Pompiers',
       gendarmerie: 'Gendarmerie',
       callNow: 'Appeler',
-      positionShared: 'Position partagée avec succès!'
+      positionShared: 'Position partagée avec succès!',
+      // Refonte design
+      searchPlaceholder: 'Rechercher un lieu',
+      searching: 'Recherche GPS…',
+      secureRoute: 'Itinéraire sécurisé',
+      recommended: 'Recommandé',
+      lowRisk: 'Faible risque',
+      avoidZones: 'Évite 2 zones à risque élevé',
+      openRoute: "Voir l'itinéraire",
+      layers: 'Couches de la carte',
+      riskZones: 'Zones à risque',
+      cautionZones: 'Zones de vigilance',
+      secureRoutes: 'Itinéraires sécurisés',
+      liveAlerts: 'Alertes en direct',
+      traffic: 'Trafic en temps réel',
+      coords: 'Coordonnées GPS'
     },
     
     // Tools tab
@@ -83,7 +119,27 @@ export const translations = {
       recordingInProgress: 'Enregistrement en cours',
       schedule: 'Programmer',
       activate: 'Activer',
-      start: 'Démarrer'
+      start: 'Démarrer',
+      // Refonte design
+      subtitle: 'Des outils puissants pour vous protéger.',
+      videoLive: 'SOS vidéo live',
+      videoLiveDesc: 'Diffusez votre vidéo en direct.',
+      ghost: 'Mode furtif',
+      ghostDesc: "Masquez l'app, alertes discrètes.",
+      fakeCallDesc: 'Simulez un appel entrant.',
+      sirenDesc: "Alarme puissante pour attirer l'attention.",
+      family: 'Mode famille',
+      familyDesc: 'Restez connecté à vos proches.',
+      history: 'Historique',
+      historyDesc: 'Vos alertes et activités passées.',
+      audio: 'Enregistrement',
+      audioDesc: "Capturez de l'audio discrètement.",
+      plate: 'Photo plaque',
+      plateDesc: 'Photographier une plaque.',
+      ai: 'Assistant IA',
+      aiDesc: 'Conseils intelligents et contextuels.',
+      share: 'Partager position',
+      shareDesc: 'En temps réel à vos contacts.'
     },
     
     // Settings
@@ -147,7 +203,7 @@ export const translations = {
     alert: {
       alertInProgress: 'ALERTE EN COURS',
       gpsPositionCaptured: 'Position GPS capturée',
-      autoSendIn: 'Envoi automatique dans...',
+      autoSendIn: 'Envoi automatique dans…',
       smsTo: 'SMS vers',
       cancelAlert: 'ANNULER L\'ALERTE',
       alertSent: 'Alerte Lancée!',
@@ -159,7 +215,84 @@ export const translations = {
       messageCopied: 'Message copié!',
       yourCoordinates: 'Vos coordonnées exactes',
       closeAndReturn: 'Fermer et revenir à l\'accueil',
-      yourSafetyOurPriority: 'SOS Africa • Votre sécurité, notre priorité'
+      yourSafetyOurPriority: 'SOS Africa • Votre sécurité, notre priorité',
+      // Refonte design
+      inProgress: 'Alerte en cours',
+      notifying: 'Les secours ont été notifiés.',
+      staySafe: 'Restez en sécurité, nous agissons.',
+      staySafeShort: 'Restez en sécurité.',
+      sendingIn: 'Envoi imminent',
+      activeAlert: 'Alerte active',
+      gpsCaptured: 'Position GPS capturée',
+      precision: 'Précision',
+      precisionUnknown: 'Précision en cours…',
+      sending: "Alertes en cours d'envoi",
+      sendingShort: 'Envoi…',
+      contactsTarget: "contacts d'urgence",
+      recording: 'Enregistrement audio & vidéo',
+      capturing: 'Capture en cours…',
+      sirenActive: 'Sirène active',
+      audioSignal: 'Signal sonore pour alerter',
+      stop: "Arrêter l'alerte",
+      sendNow: 'Envoyer maintenant',
+      sentSuccess: 'Alerte envoyée avec succès',
+      recipients: 'Destinataires alertés',
+      copied: 'Copié!',
+      copy: 'Copier',
+      backHome: "Retour à l'accueil"
+    },
+
+    // Contacts (refonte)
+    contacts: {
+      title: "Contacts d'urgence",
+      ready: 'prêts à recevoir vos alertes.',
+      empty: 'Ajoutez votre premier contact.',
+      edit: 'Modifier le contact',
+      add: 'Ajouter un contact',
+      fullName: 'Nom complet',
+      phone: 'Numéro de téléphone',
+      save: 'Enregistrer',
+      shareLocation: 'Partager ma position',
+      realtime: 'Temps réel',
+      shareDesc: 'Vos proches peuvent vous suivre en direct.',
+      addFirst: 'Ajouter votre premier contact',
+      addFirstDesc: 'Au moins un contact est requis pour activer le SOS.',
+      import: 'Importer depuis le téléphone'
+    },
+
+    // Profile / Premium (refonte)
+    profile: {
+      greeting: 'Membre · Édition gratuite',
+      upgradeTitle: 'Passer à Premium',
+      upgradeSubtitle: 'Débloquez la protection maximale pour vous et vos proches.',
+      featVideo: 'SOS vidéo illimité',
+      featVideoDesc: 'Connectez-vous en vidéo à nos agents.',
+      featAI: "Assistant IA d'urgence",
+      featAIDesc: 'Réponses instantanées 24/7.',
+      featAlerts: 'Alertes en temps réel',
+      featAlertsDesc: 'Notifications instantanées.',
+      featFamily: 'Mode famille avancé',
+      featFamilyDesc: "Jusqu'à 5 proches, suivi temps réel.",
+      featHistory: 'Preuves sécurisées',
+      featHistoryDesc: 'Enregistrements et rapports stockés.',
+      featSupport: 'Support prioritaire 24/7',
+      featSupportDesc: 'Une équipe dédiée, toujours là.',
+      cancelAnytime: 'Annulation possible à tout moment.',
+      upgradeCTA: 'Passer à Premium',
+      trial: 'Essai gratuit 7 jours · Sans engagement',
+      settings: 'Réglages',
+      language: 'Langue',
+      theme: 'Thème',
+      darkMode: 'Sombre',
+      lightMode: 'Clair',
+      alertHistory: 'Historique des alertes',
+      entries: 'entrées',
+      donate: 'Soutenir le projet',
+      donateDesc: 'Aidez-nous à protéger plus de personnes',
+      shareApp: "Partager l'application",
+      privacy: 'Vie privée & sécurité',
+      privacyDesc: 'Données stockées localement',
+      about: 'À propos'
     },
     
     // Onboarding
@@ -278,8 +411,10 @@ export const translations = {
     // Navigation
     nav: {
       home: 'Home',
-      location: 'Location',
-      tools: 'Tools',
+      location: 'Map',
+      tools: 'Alerts',
+      contacts: 'Contacts',
+      profile: 'Profile',
       settings: 'Settings'
     },
     

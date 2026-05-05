@@ -1,242 +1,382 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  AlertTriangle, MapPin, RefreshCw, 
-  Users, Wifi, WifiOff, Zap, ZapOff, Navigation,
-  Mic, Route, Globe, Locate
-} from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  IShieldCheck,
+  IPin,
+  IBrain,
+  IUser,
+  IFamily,
+  IWifi,
+  IWifiOff,
+  IMask,
+  ILightning,
+} from './ui/icons';
+import { StatusRow, SectionTitle } from './ui/atoms';
+import { useReverseGeocode } from '../hooks/useReverseGeocode';
 
-// Base de données des pays avec drapeaux et images
-const COUNTRIES_DATABASE = {
-  'Cameroon': { flag: '🇨🇲', name: 'Cameroun', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&q=80' },
-  'France': { flag: '🇫🇷', name: 'France', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80' },
-  'Ivory Coast': { flag: '🇨🇮', name: 'Côte d\'Ivoire', image: 'https://images.unsplash.com/photo-1590664863685-a99ef05e9f61?w=800&q=80' },
-  'Côte d\'Ivoire': { flag: '🇨🇮', name: 'Côte d\'Ivoire', image: 'https://images.unsplash.com/photo-1590664863685-a99ef05e9f61?w=800&q=80' },
-  'Senegal': { flag: '🇸🇳', name: 'Sénégal', image: 'https://images.unsplash.com/photo-1589391886645-d51941baf7fb?w=800&q=80' },
-  'Gabon': { flag: '🇬🇦', name: 'Gabon', image: 'https://images.unsplash.com/photo-1504432842672-1a79f78e4084?w=800&q=80' },
-  'Congo': { flag: '🇨🇬', name: 'Congo', image: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800&q=80' },
-  'Nigeria': { flag: '🇳🇬', name: 'Nigeria', image: 'https://images.unsplash.com/photo-1618828665011-0abd973f7bb8?w=800&q=80' },
-  'Belgium': { flag: '🇧🇪', name: 'Belgique', image: 'https://images.unsplash.com/photo-1559113513-d5e09c78b9dd?w=800&q=80' },
-  'Italy': { flag: '🇮🇹', name: 'Italie', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=800&q=80' },
-  'United Kingdom': { flag: '🇬🇧', name: 'Royaume-Uni', image: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&q=80' },
-  'United States': { flag: '🇺🇸', name: 'États-Unis', image: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=800&q=80' },
-  'Canada': { flag: '🇨🇦', name: 'Canada', image: 'https://images.unsplash.com/photo-1519178614-68673b201f36?w=800&q=80' },
-  'Morocco': { flag: '🇲🇦', name: 'Maroc', image: 'https://images.unsplash.com/photo-1569383746724-6f1b882b8f46?w=800&q=80' },
-  'South Africa': { flag: '🇿🇦', name: 'Afrique du Sud', image: 'https://images.unsplash.com/photo-1577948000111-9c970dfe3743?w=800&q=80' },
-  'Germany': { flag: '🇩🇪', name: 'Allemagne', image: 'https://images.unsplash.com/photo-1560969184-10fe8719e047?w=800&q=80' },
-  'Spain': { flag: '🇪🇸', name: 'Espagne', image: 'https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=800&q=80' },
-  'Switzerland': { flag: '🇨🇭', name: 'Suisse', image: 'https://images.unsplash.com/photo-1573108724029-4c46571d6490?w=800&q=80' },
-  'Mali': { flag: '🇲🇱', name: 'Mali', image: 'https://images.unsplash.com/photo-1489392191049-fc10c97e64b6?w=800&q=80' },
-  'Ghana': { flag: '🇬🇭', name: 'Ghana', image: 'https://images.unsplash.com/photo-1618828665011-0abd973f7bb8?w=800&q=80' },
-  'Togo': { flag: '🇹🇬', name: 'Togo', image: 'https://images.unsplash.com/photo-1489392191049-fc10c97e64b6?w=800&q=80' },
-  'Benin': { flag: '🇧🇯', name: 'Bénin', image: 'https://images.unsplash.com/photo-1489392191049-fc10c97e64b6?w=800&q=80' },
-  'Chad': { flag: '🇹🇩', name: 'Tchad', image: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800&q=80' },
-};
-
-const DEFAULT_LOCATION = {
-  city: 'Position actuelle',
-  country: 'Monde',
-  flag: '🌍',
-  image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80',
-  address: 'Recherche en cours...'
-};
-
-const HomeTab = ({ location, gpsLoading, gpsError, refreshGPS, contacts, isOnline, shakeEnabled, setShakeEnabled, onTriggerSOS, isPremium, journeyActive, recordingActive, userName, t, isDark }) => {
-  const [locationInfo, setLocationInfo] = useState(DEFAULT_LOCATION);
-  const [addressLoading, setAddressLoading] = useState(false);
-
-  // Reverse geocoding - Obtenir l'adresse exacte depuis les coordonnées GPS
-  useEffect(() => {
-    const fetchAddress = async () => {
-      if (!location?.lat || !location?.lng) return;
-      
-      setAddressLoading(true);
-      
-      try {
-        // API gratuite Nominatim (OpenStreetMap)
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}&zoom=18&addressdetails=1`,
-          { headers: { 'Accept-Language': 'fr' } }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          const addr = data.address || {};
-          
-          const city = addr.city || addr.town || addr.village || addr.municipality || addr.state || 'Ville';
-          const country = addr.country || 'Pays inconnu';
-          const road = addr.road || addr.pedestrian || '';
-          const neighbourhood = addr.neighbourhood || addr.suburb || addr.quarter || '';
-          const houseNumber = addr.house_number || '';
-          
-          // Construire l'adresse
-          let fullAddress = '';
-          if (houseNumber) fullAddress += houseNumber + ' ';
-          if (road) fullAddress += road;
-          if (neighbourhood && !fullAddress.includes(neighbourhood)) {
-            fullAddress += fullAddress ? ', ' + neighbourhood : neighbourhood;
-          }
-          if (!fullAddress) fullAddress = city;
-          
-          // Trouver les infos du pays
-          const countryInfo = COUNTRIES_DATABASE[country] || { flag: '🌍', name: country, image: DEFAULT_LOCATION.image };
-          
-          setLocationInfo({
-            city,
-            country: countryInfo.name,
-            flag: countryInfo.flag,
-            image: countryInfo.image,
-            address: fullAddress
-          });
-        }
-      } catch (error) {
-        console.log('Erreur géocodage:', error);
-        setLocationInfo({
-          ...DEFAULT_LOCATION,
-          address: `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
-        });
-      } finally {
-        setAddressLoading(false);
-      }
-    };
-
-    fetchAddress();
-  }, [location?.lat, location?.lng]);
-
-  const bgCard = isDark ? 'bg-slate-800/50' : 'bg-white';
-  const borderColor = isDark ? 'border-slate-700' : 'border-slate-200';
-  const textColor = isDark ? 'text-white' : 'text-slate-900';
-  const textSecondary = isDark ? 'text-slate-400' : 'text-slate-600';
+const SOSButton = ({ onClick, t }) => {
+  const [pressed, setPressed] = useState(false);
+  const press = () => setPressed(true);
+  const release = () => setPressed(false);
 
   return (
-    <div className="p-4 space-y-4 pb-28">
-      {/* Carte de localisation avec image dynamique */}
-      <div className="relative rounded-2xl overflow-hidden h-48">
-        <div className="absolute inset-0 bg-cover bg-center transition-all duration-700" style={{ backgroundImage: `url('${locationInfo.image}')`, filter: 'brightness(0.4)' }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
-        
-        <div className="relative h-full flex flex-col justify-between p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full">
-              <div className={`w-2 h-2 rounded-full ${location ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
-              <span className="text-white text-xs font-medium">{location ? 'GPS Actif' : 'Recherche...'}</span>
-            </div>
-            <span className="text-5xl drop-shadow-lg">{locationInfo.flag}</span>
-          </div>
-          
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Locate className="w-4 h-4 text-red-400" />
-              <span className="text-white/90 text-sm font-medium truncate max-w-[280px]">
-                {addressLoading ? 'Localisation...' : locationInfo.address}
-              </span>
-            </div>
-            <h2 className="text-white text-2xl font-bold">{locationInfo.city}</h2>
-            <p className="text-white/70 text-sm flex items-center gap-2">
-              <Globe className="w-3 h-3" />
-              {locationInfo.country}
-            </p>
-          </div>
-        </div>
+    <div
+      className="relative flex items-center justify-center my-2"
+      style={{ height: 280 }}
+    >
+      {/* Static concentric rings */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="rounded-full"
+          style={{
+            width: 240,
+            height: 240,
+            border: '1px solid rgba(255,46,63,.18)',
+          }}
+        />
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="rounded-full"
+          style={{
+            width: 200,
+            height: 200,
+            border: '1px solid rgba(255,46,63,.22)',
+          }}
+        />
       </div>
 
-      {/* Bienvenue */}
-      <div className="text-center py-2">
-        <p className={`${textSecondary} text-sm`}>{t('home.hello')},</p>
-        <h1 className={`text-2xl font-bold ${textColor}`}>{userName || 'Utilisateur'}</h1>
+      {/* Animated rings */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div
+          style={{
+            width: 170,
+            height: 170,
+            borderRadius: '50%',
+            border: '2px solid rgba(255,46,63,.55)',
+            animation: 'pulse-ring 2.4s ease-out infinite',
+          }}
+        />
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div
+          style={{
+            width: 170,
+            height: 170,
+            borderRadius: '50%',
+            border: '2px solid rgba(255,46,63,.45)',
+            animation: 'pulse-ring 2.4s ease-out 1.2s infinite',
+          }}
+        />
       </div>
 
-      {/* Indicateurs actifs */}
-      {(journeyActive || recordingActive) && (
-        <div className="flex gap-2 justify-center flex-wrap">
-          {journeyActive && (
-            <div className="px-3 py-1.5 bg-green-500/20 rounded-full flex items-center gap-2">
-              <Route className="w-4 h-4 text-green-400" />
-              <span className="text-green-400 text-xs font-medium">Trajet en cours</span>
-            </div>
-          )}
-          {recordingActive && (
-            <div className="px-3 py-1.5 bg-red-500/20 rounded-full flex items-center gap-2 animate-pulse">
-              <Mic className="w-4 h-4 text-red-400" />
-              <span className="text-red-400 text-xs font-medium">Enregistrement</span>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Tick marks */}
+      <svg
+        className="absolute"
+        width="280"
+        height="280"
+        viewBox="0 0 280 280"
+        aria-hidden
+      >
+        {Array.from({ length: 24 }).map((_, i) => {
+          const a = (i / 24) * Math.PI * 2;
+          const x1 = 140 + Math.cos(a) * 128;
+          const y1 = 140 + Math.sin(a) * 128;
+          const x2 = 140 + Math.cos(a) * 134;
+          const y2 = 140 + Math.sin(a) * 134;
+          return (
+            <line
+              key={i}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke="rgba(255,46,63,.35)"
+              strokeWidth="1.2"
+            />
+          );
+        })}
+      </svg>
 
-      {/* Bouton SOS */}
-      <div className="flex justify-center py-4">
-        <button onClick={onTriggerSOS} className="relative w-56 h-56 rounded-full focus:outline-none active:scale-95 transition-transform">
-          <div className="absolute inset-0 rounded-full bg-red-600/20 animate-ping" />
-          <div className="absolute inset-2 rounded-full bg-red-600/30 animate-pulse" />
-          <div className="absolute inset-4 rounded-full bg-gradient-to-br from-red-500 via-red-600 to-red-800 shadow-2xl shadow-red-500/50 flex flex-col items-center justify-center border-4 border-red-400/30">
-            <AlertTriangle className="w-16 h-16 text-white mb-2 drop-shadow-lg" />
-            <span className="text-3xl font-black text-white tracking-wider drop-shadow-lg">{t('home.sosButton')}</span>
-            <span className="text-sm font-medium text-red-100 mt-1">{t('home.pressInDanger')}</span>
-          </div>
-        </button>
-      </div>
-
-      {/* Shake to Alert */}
-      <button onClick={() => setShakeEnabled(!shakeEnabled)} className={`w-full p-4 rounded-2xl flex items-center justify-between transition-all ${shakeEnabled ? 'bg-yellow-500/20 border-2 border-yellow-500/50' : isDark ? 'bg-slate-800/50 border-2 border-slate-700' : 'bg-slate-100 border-2 border-slate-200'}`}>
-        <div className="flex items-center gap-3">
-          {shakeEnabled ? <Zap className="w-6 h-6 text-yellow-400" /> : <ZapOff className="w-6 h-6 text-slate-500" />}
-          <div className="text-left">
-            <p className={`font-semibold ${shakeEnabled ? 'text-yellow-400' : textSecondary}`}>{t('home.shakeToAlert')}</p>
-            <p className={`text-xs ${textSecondary}`}>{shakeEnabled ? t('home.shake3Times') : t('home.disabled')}</p>
-          </div>
+      {/* Inner button */}
+      <button
+        onMouseDown={press}
+        onMouseUp={release}
+        onMouseLeave={release}
+        onTouchStart={press}
+        onTouchEnd={release}
+        onClick={onClick}
+        className="tap relative rounded-full flex flex-col items-center justify-center select-none"
+        style={{
+          width: pressed ? 178 : 168,
+          height: pressed ? 178 : 168,
+          background:
+            'radial-gradient(circle at 50% 30%, #FF6E7B 0%, #E8202F 35%, #8C0A14 100%)',
+          border: '2px solid rgba(255,255,255,.18)',
+          animation: pressed
+            ? 'pulse-glow 1.1s ease-in-out infinite'
+            : 'pulse-glow 2.4s ease-in-out infinite',
+          transition: 'width .2s, height .2s',
+        }}
+      >
+        <div
+          className="absolute inset-2 rounded-full pointer-events-none"
+          style={{
+            boxShadow:
+              'inset 0 1px 0 rgba(255,255,255,.3), inset 0 -20px 30px rgba(0,0,0,.4)',
+          }}
+        />
+        <div
+          className="text-white font-extrabold leading-none font-display"
+          style={{
+            fontSize: 42,
+            letterSpacing: '.04em',
+            textShadow: '0 2px 12px rgba(0,0,0,.5)',
+          }}
+        >
+          {t ? t('home.sosButton') : 'SOS'}
         </div>
-        <div className={`w-12 h-7 rounded-full p-1 transition-colors ${shakeEnabled ? 'bg-yellow-500' : isDark ? 'bg-slate-600' : 'bg-slate-300'}`}>
-          <div className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${shakeEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+        <div
+          className="text-white/95 text-[11px] font-semibold mt-1.5 px-3 text-center leading-tight"
+          style={{ textShadow: '0 1px 4px rgba(0,0,0,.5)' }}
+        >
+          {t ? t('home.pressInDanger') : "Appuyer en cas\nd'urgence"}
         </div>
       </button>
+    </div>
+  );
+};
 
-      {/* GPS Status */}
-      <div className={`${bgCard} rounded-2xl p-4 border ${borderColor}`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <MapPin className={`w-5 h-5 ${gpsError ? 'text-red-400' : location ? 'text-green-400' : 'text-yellow-400'}`} />
-            <span className={`font-semibold ${textColor}`}>{gpsError ? 'Erreur GPS' : location ? 'Position GPS' : 'Recherche GPS'}</span>
-          </div>
-          <button onClick={refreshGPS} disabled={gpsLoading} className={`p-2 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded-lg`}>
-            <RefreshCw className={`w-4 h-4 ${textSecondary} ${gpsLoading ? 'animate-spin' : ''}`} />
-          </button>
+const QuickAction = ({ icon: Icn, title, sub, color = 'blue', halo = 'blue', onClick }) => {
+  const c =
+    color === 'blue'
+      ? 'var(--blue)'
+      : color === 'purple'
+      ? 'var(--purple)'
+      : color === 'amber'
+      ? 'var(--amber)'
+      : 'var(--green)';
+  return (
+    <button
+      onClick={onClick}
+      className={`tap relative glass rounded-2xl p-3 text-left flex flex-col gap-1.5 halo-${halo}`}
+      style={{ borderColor: 'var(--stroke)' }}
+    >
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center"
+        style={{
+          background: `color-mix(in oklab, ${c} 16%, transparent)`,
+          color: c,
+          border: `1px solid color-mix(in oklab, ${c} 35%, transparent)`,
+          boxShadow: `0 0 18px color-mix(in oklab, ${c} 30%, transparent)`,
+        }}
+      >
+        <Icn size={20} />
+      </div>
+      <div className="text-[12.5px] font-bold text-white leading-tight">{title}</div>
+      <div className="text-[10.5px] font-semibold" style={{ color: c }}>
+        {sub}
+      </div>
+    </button>
+  );
+};
+
+const HomeTab = ({
+  location,
+  contacts,
+  isOnline,
+  shakeEnabled,
+  setShakeEnabled,
+  onTriggerSOS,
+  onTriggerSilent,
+  onNav,
+  userName,
+  journeyActive,
+  recordingActive,
+  t,
+}) => {
+  const { info: geoInfo } = useReverseGeocode(location);
+  const placeShort =
+    geoInfo?.neighbourhood ||
+    geoInfo?.city ||
+    (location ? `${location.lat.toFixed(3)}, ${location.lng.toFixed(3)}` : '');
+  const placeFull =
+    geoInfo?.city && geoInfo?.country
+      ? `${geoInfo.city}, ${geoInfo.country}`
+      : geoInfo?.line || placeShort;
+
+  return (
+    <div className="screen-in flex flex-col px-0 pb-32">
+      <div className="px-5 pb-2">
+        <div
+          className="text-[22px] font-extrabold text-white leading-tight font-display"
+          style={{ letterSpacing: '-.01em' }}
+        >
+          {`Salut, ${userName || ''}`}
         </div>
-        {location && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-100'} rounded-xl p-3`}>
-              <p className={`text-xs ${textSecondary} mb-1`}>Latitude</p>
-              <p className={`text-lg font-mono font-bold ${textColor}`}>{location.lat.toFixed(6)}</p>
-            </div>
-            <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-100'} rounded-xl p-3`}>
-              <p className={`text-xs ${textSecondary} mb-1`}>Longitude</p>
-              <p className={`text-lg font-mono font-bold ${textColor}`}>{location.lng.toFixed(6)}</p>
-            </div>
+        <div className="flex items-center gap-1.5 text-[12.5px] text-white/65">
+          {t ? t('home.protectedStatus') : 'Vous êtes protégé'}
+          <IShieldCheck size={14} className="text-[color:var(--green)]" />
+        </div>
+        {placeShort && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-white/55">
+            <IPin size={12} className="text-[color:var(--blue)]" />
+            <span className="truncate">{placeFull || placeShort}</span>
           </div>
         )}
       </div>
 
-      {/* Status cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className={`rounded-2xl p-4 border ${isOnline ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/50 border-slate-700'}`}>
-          <div className="flex items-center gap-2 mb-2">
-            {isOnline ? <Wifi className="w-5 h-5 text-green-400" /> : <WifiOff className="w-5 h-5 text-slate-500" />}
-            <span className={`font-semibold ${isOnline ? 'text-green-400' : textSecondary}`}>{isOnline ? 'En ligne' : 'Hors ligne'}</span>
-          </div>
+      {(journeyActive || recordingActive) && (
+        <div className="px-5 mb-1 flex gap-2 justify-center flex-wrap">
+          {journeyActive && (
+            <span className="px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5"
+                  style={{ color: 'var(--green)', background: 'rgba(34,214,123,.12)', border: '1px solid rgba(34,214,123,.35)' }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--green)', boxShadow: '0 0 8px var(--green)' }} />
+              {t ? t('home.journeyInProgress') : 'Trajet en cours'}
+            </span>
+          )}
+          {recordingActive && (
+            <span className="px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5"
+                  style={{ color: 'var(--red-soft)', background: 'rgba(255,46,63,.12)', border: '1px solid rgba(255,46,63,.35)', animation: 'blink 1.4s infinite' }}>
+              ● REC
+            </span>
+          )}
         </div>
-        <div className={`rounded-2xl p-4 border ${contacts.length > 0 ? 'bg-blue-500/10 border-blue-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-          <div className="flex items-center gap-2 mb-2">
-            <Users className={`w-5 h-5 ${contacts.length > 0 ? 'text-blue-400' : 'text-red-400'}`} />
-            <span className={`font-semibold ${contacts.length > 0 ? 'text-blue-400' : 'text-red-400'}`}>{contacts.length} contacts</span>
+      )}
+
+      <SOSButton onClick={onTriggerSOS} t={t} />
+
+      <div className="px-5 -mt-1 mb-3 flex justify-center gap-2">
+        <button
+          onClick={onTriggerSilent}
+          className="tap glass rounded-full px-3.5 py-1.5 text-[11.5px] font-semibold flex items-center gap-1.5 halo-red"
+          style={{ borderColor: 'rgba(255,46,63,.4)', color: '#FF7884' }}
+        >
+          <IMask size={13} /> {t ? t('home.silentSOS') || 'SOS silencieux' : 'SOS silencieux'}
+        </button>
+        <button
+          onClick={() => setShakeEnabled(!shakeEnabled)}
+          className="tap glass rounded-full px-3.5 py-1.5 text-[11.5px] font-semibold flex items-center gap-1.5 halo-gold"
+          style={{
+            borderColor: shakeEnabled ? 'rgba(244,194,75,.5)' : 'var(--stroke)',
+            color: shakeEnabled ? 'var(--gold)' : 'rgba(255,255,255,.55)',
+          }}
+        >
+          <ILightning size={13} />
+          {shakeEnabled
+            ? t ? t('home.shakeOn') || 'Secousse ON' : 'Secousse ON'
+            : t ? t('home.shakeOff') || 'Secousse OFF' : 'Secousse OFF'}
+        </button>
+      </div>
+
+      <div className="px-5 mb-3">
+        <SectionTitle>{t ? t('home.quickActions') || 'Actions rapides' : 'Actions rapides'}</SectionTitle>
+        <div className="grid grid-cols-3 gap-2.5">
+          <QuickAction
+            icon={IPin}
+            title={t ? t('home.shareLocation') || 'Partager position' : 'Partager position'}
+            sub={t ? t('home.realtime') || 'En temps réel' : 'En temps réel'}
+            color="blue"
+            halo="blue"
+            onClick={() => onNav && onNav('map')}
+          />
+          <QuickAction
+            icon={IBrain}
+            title={t ? t('home.aiAssistant') || 'Assistant IA' : 'Assistant IA'}
+            sub={t ? t('home.smartHelp') || 'Aide intelligente' : 'Aide intelligente'}
+            color="purple"
+            halo="purple"
+            onClick={() => onNav && onNav('tools')}
+          />
+          <QuickAction
+            icon={IUser}
+            title={t ? t('home.followed') || 'Je me sens suivi' : 'Je me sens suivi'}
+            sub={t ? t('home.discreetAlert') || 'Alerte discrète' : 'Alerte discrète'}
+            color="amber"
+            halo="gold"
+            onClick={onTriggerSilent}
+          />
+        </div>
+      </div>
+
+      <div className="px-5">
+        <div className="glass rounded-2xl p-3.5">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="text-[13px] font-bold text-white/90 font-display">
+              {t ? t('home.systemStatus') || 'Statut du système' : 'Statut du système'}
+            </div>
+            <div
+              className="text-[10.5px] font-semibold flex items-center gap-1"
+              style={{ color: 'var(--green)' }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: 'var(--green)', boxShadow: '0 0 8px var(--green)' }}
+              />
+              {t ? t('home.allActive') || 'Tout est actif' : 'Tout est actif'}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <StatusRow
+              icon={IPin}
+              label={t ? t('home.gpsPosition') : 'Position GPS'}
+              value={
+                location
+                  ? placeShort || (t ? t('home.gpsActive') || 'Active' : 'Active')
+                  : t ? t('home.searchingGps') || 'Recherche...' : 'Recherche...'
+              }
+              color={location ? 'green' : 'amber'}
+            />
+            <StatusRow
+              icon={IFamily}
+              label={t ? t('home.contactsLabel') || "Contacts d'urgence" : "Contacts d'urgence"}
+              value={
+                contacts.length > 0
+                  ? `${contacts.length} ${t ? t('home.contactsReady') || 'prêts' : 'prêts'}`
+                  : t ? t('home.contactsAddRequired') || 'À ajouter' : 'À ajouter'
+              }
+              color={contacts.length > 0 ? 'green' : 'red'}
+            />
+            <StatusRow
+              icon={isOnline ? IWifi : IWifiOff}
+              label={t ? t('home.connection') || 'Connexion' : 'Connexion'}
+              value={
+                isOnline
+                  ? t ? t('home.online') || 'En ligne' : 'En ligne'
+                  : t ? t('home.offline') || 'Hors ligne' : 'Hors ligne'
+              }
+              color={isOnline ? 'blue' : 'amber'}
+            />
           </div>
         </div>
       </div>
 
       {contacts.length === 0 && (
-        <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 flex items-start gap-3">
-          <AlertTriangle className="w-6 h-6 text-orange-400 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-orange-400">Configuration requise</p>
-            <p className={`text-sm ${textSecondary}`}>Ajoutez au moins un contact d'urgence</p>
+        <div className="px-5 mt-3">
+          <div
+            className="rounded-2xl p-3.5 flex items-start gap-3"
+            style={{
+              background: 'rgba(255,176,32,.10)',
+              border: '1px solid rgba(255,176,32,.35)',
+            }}
+          >
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{
+                background: 'rgba(255,176,32,.18)',
+                color: 'var(--amber)',
+                border: '1px solid rgba(255,176,32,.4)',
+              }}
+            >
+              <IShieldCheck size={16} />
+            </div>
+            <div className="flex-1">
+              <div className="text-[13px] font-bold text-white">
+                {t ? t('home.configRequired') || 'Configuration requise' : 'Configuration requise'}
+              </div>
+              <div className="text-[12px] text-white/60">
+                {t ? t('home.addContactsMessage') || "Ajoutez au moins un contact d'urgence." : "Ajoutez au moins un contact d'urgence."}
+              </div>
+            </div>
           </div>
         </div>
       )}

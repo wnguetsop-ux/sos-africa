@@ -1,262 +1,309 @@
 import React, { useState } from 'react';
-import { 
-  X, Star, Check, Crown, Zap, Shield, 
-  Mic, Users, MessageCircle, Clock,
-  ChevronRight, Sparkles
-} from 'lucide-react';
+import {
+  IX,
+  ICrown,
+  ICheck,
+  IShieldCheck,
+} from './ui/icons';
 
-const PremiumModal = ({ 
-  isOpen, 
-  onClose, 
-  blockedFeature,
-  premiumHook 
-}) => {
-  const {
-    plan: currentPlan,
-    PLANS,
-    formatPrice,
-    getBlockedMessage,
-    subscribeToPlan
-  } = premiumHook;
+const PLANS = [
+  { id: 'monthly', label: 'Mensuel', price: '1,99 €', sub: '/ mois', save: null },
+  { id: 'yearly', label: 'Annuel', price: '19 €', sub: '/ an', save: '-20%' },
+  { id: 'family', label: 'Famille', price: '3,99 €', sub: '/ mois · 5 comptes', save: 'Best' },
+];
 
-  const [selectedPlan, setSelectedPlan] = useState('basic');
-  const [isProcessing, setIsProcessing] = useState(false);
+const METHODS = [
+  { id: 'momo', label: 'Mobile Money', sub: 'Orange · MTN · Wave', emoji: '📱' },
+  { id: 'card', label: 'Carte bancaire', sub: 'Visa · Mastercard', emoji: '💳' },
+  { id: 'paypal', label: 'PayPal', sub: 'Compte PayPal', emoji: '🅿️' },
+];
+
+const PremiumModal = ({ isOpen, onClose, t }) => {
+  const [plan, setPlan] = useState('monthly');
+  const [method, setMethod] = useState('momo');
+  const [phone, setPhone] = useState('');
+  const [step, setStep] = useState('select'); // 'select' | 'pay' | 'pending' | 'done'
 
   if (!isOpen) return null;
 
-  // Icônes des fonctionnalités
-  const featureIcons = {
-    contacts: Users,
-    recording: Mic,
-    communityAlerts: Users,
-    whatsapp: MessageCircle,
-    journey: Shield,
-    history: Clock
-  };
+  const selected = PLANS.find((p) => p.id === plan);
 
-  // Handler d'achat
-  const handlePurchase = async () => {
-    setIsProcessing(true);
-    
-    // Simuler le processus de paiement
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const success = await subscribeToPlan(selectedPlan);
-    
-    setIsProcessing(false);
-    
-    if (success) {
-      onClose();
-    }
+  const close = () => {
+    setStep('select');
+    setPhone('');
+    onClose();
+  };
+  const proceedToPay = () => setStep('pay');
+  const submitPayment = () => {
+    setStep('pending');
+    setTimeout(() => setStep('done'), 1800);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center">
+      <div
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(10px)' }}
+        onClick={close}
       />
-      
-      {/* Modal */}
-      <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 to-slate-950 
-                      rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto
-                      border border-slate-700/50 shadow-2xl">
-        
-        {/* Header */}
-        <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm p-4 border-b border-slate-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Crown className="w-6 h-6 text-yellow-400" />
-              <h2 className="text-xl font-bold text-white">Passer à Premium</h2>
+      <div className="relative w-full max-w-md mx-auto safe-area-inset overflow-y-auto no-scrollbar">
+        <div className="p-4 pt-6">
+          <div className="glass-strong rounded-3xl p-5 ring-gold relative overflow-hidden">
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'radial-gradient(120% 80% at 50% -20%, rgba(244,194,75,.18), transparent 60%)',
+              }}
+            />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <ICrown size={18} className="text-[color:var(--gold)]" />
+                  <div className="text-[16px] font-extrabold text-grad-gold font-display">
+                    Passer à Premium
+                  </div>
+                </div>
+                <button
+                  onClick={close}
+                  className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
+                  style={{ borderColor: 'var(--stroke)' }}
+                  aria-label="Fermer"
+                >
+                  <IX size={16} />
+                </button>
+              </div>
+
+              {step === 'select' && (
+                <>
+                  <p className="text-[12.5px] text-white/65 mb-3">
+                    Choisissez votre formule. Annulation à tout moment.
+                  </p>
+                  <div className="space-y-2 mb-4">
+                    {PLANS.map((p) => {
+                      const isActive = plan === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setPlan(p.id)}
+                          className="w-full glass rounded-2xl p-3 flex items-center gap-3 text-left tap halo-gold"
+                          style={{
+                            borderColor: isActive ? 'rgba(244,194,75,.5)' : 'var(--stroke)',
+                            background: isActive ? 'rgba(244,194,75,.10)' : undefined,
+                          }}
+                        >
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                            style={{
+                              background: isActive
+                                ? 'linear-gradient(180deg,#FFD86A,#D9971C)'
+                                : 'rgba(255,255,255,.05)',
+                              color: isActive ? '#241500' : 'rgba(255,255,255,.55)',
+                              border: '1px solid rgba(244,194,75,.35)',
+                            }}
+                          >
+                            {isActive ? <ICheck size={14} stroke={3} /> : null}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-bold text-white">{p.label}</div>
+                            <div className="text-[11px] text-white/55">
+                              {p.price} {p.sub}
+                            </div>
+                          </div>
+                          {p.save && (
+                            <span
+                              className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md"
+                              style={{
+                                color: 'var(--green)',
+                                background: 'rgba(34,214,123,.15)',
+                                border: '1px solid rgba(34,214,123,.35)',
+                              }}
+                            >
+                              {p.save}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="text-[11px] uppercase tracking-[0.2em] font-extrabold text-white/50 mb-2 px-1">
+                      Méthode de paiement
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {METHODS.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => setMethod(m.id)}
+                          className="tap glass rounded-xl py-2.5 flex flex-col items-center gap-0.5 halo-gold"
+                          style={{
+                            borderColor:
+                              method === m.id ? 'rgba(244,194,75,.5)' : 'var(--stroke)',
+                            background: method === m.id ? 'rgba(244,194,75,.08)' : undefined,
+                          }}
+                        >
+                          <div className="text-xl leading-none">{m.emoji}</div>
+                          <div className="text-[10.5px] font-bold text-white/85 text-center leading-tight">
+                            {m.label}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={proceedToPay}
+                    className="tap btn-primary-gold w-full py-3.5 rounded-xl text-[14px] font-extrabold flex items-center justify-center gap-2 font-display"
+                  >
+                    Continuer · {selected.price} <ICrown size={16} />
+                  </button>
+                  <div className="text-[10.5px] text-white/45 text-center mt-2">
+                    Essai gratuit 7 jours · Sans engagement
+                  </div>
+                </>
+              )}
+
+              {step === 'pay' && (
+                <>
+                  <div className="glass rounded-2xl p-3 mb-3" style={{ borderColor: 'var(--stroke)' }}>
+                    <div className="text-[11px] uppercase tracking-wider text-white/55 font-bold mb-1">
+                      Récap
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-[13px] text-white">{selected.label}</div>
+                      <div className="text-[16px] font-extrabold text-grad-gold">
+                        {selected.price}
+                        <span className="text-[12px] text-white/55 ml-1">{selected.sub}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {method === 'momo' && (
+                    <>
+                      <label className="text-[11.5px] text-white/65 font-bold mb-1 block">
+                        Numéro Mobile Money
+                      </label>
+                      <input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        type="tel"
+                        placeholder="+237 6XX XX XX XX"
+                        className="w-full px-3 py-2.5 rounded-xl glass text-[13.5px] text-white/95 placeholder-white/40 mb-2"
+                        style={{ borderColor: 'var(--stroke)' }}
+                      />
+                      <div className="text-[10.5px] text-white/45 mb-3">
+                        Vous recevrez un code de validation sur votre téléphone.
+                      </div>
+                    </>
+                  )}
+
+                  {method === 'card' && (
+                    <>
+                      <label className="text-[11.5px] text-white/65 font-bold mb-1 block">
+                        Saisie carte bancaire
+                      </label>
+                      <div className="grid gap-2 mb-3">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Numéro de carte"
+                          className="w-full px-3 py-2.5 rounded-xl glass text-[13.5px] text-white/95 placeholder-white/40"
+                          style={{ borderColor: 'var(--stroke)' }}
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="MM/AA"
+                            className="px-3 py-2.5 rounded-xl glass text-[13.5px] text-white/95 placeholder-white/40"
+                            style={{ borderColor: 'var(--stroke)' }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="CVC"
+                            className="px-3 py-2.5 rounded-xl glass text-[13.5px] text-white/95 placeholder-white/40"
+                            style={{ borderColor: 'var(--stroke)' }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10.5px] text-white/55 mb-3">
+                        <IShieldCheck size={11} className="text-[color:var(--green)]" />
+                        Paiement chiffré · 3-D Secure
+                      </div>
+                    </>
+                  )}
+
+                  {method === 'paypal' && (
+                    <div className="text-[12.5px] text-white/65 mb-3">
+                      Vous serez redirigé vers PayPal pour valider le paiement.
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setStep('select')}
+                      className="tap glass flex-1 py-3 rounded-xl text-[13px] font-bold text-white/85"
+                      style={{ borderColor: 'var(--stroke)' }}
+                    >
+                      Retour
+                    </button>
+                    <button
+                      onClick={submitPayment}
+                      className="tap btn-primary-gold flex-1 py-3 rounded-xl text-[13px] font-extrabold flex items-center justify-center gap-1.5 font-display"
+                    >
+                      Payer {selected.price}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {step === 'pending' && (
+                <div className="text-center py-6">
+                  <div
+                    className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3"
+                    style={{
+                      background: 'rgba(244,194,75,.12)',
+                      border: '1px solid rgba(244,194,75,.4)',
+                    }}
+                  >
+                    <div className="spinner" />
+                  </div>
+                  <div className="text-[14px] font-bold text-white mb-1">Paiement en cours…</div>
+                  <div className="text-[12px] text-white/60">Veuillez patienter quelques secondes.</div>
+                </div>
+              )}
+
+              {step === 'done' && (
+                <div className="text-center py-6">
+                  <div
+                    className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3"
+                    style={{
+                      background: 'linear-gradient(180deg,#5BF6A8,#14B873)',
+                      boxShadow: '0 0 40px rgba(34,214,123,.55)',
+                    }}
+                  >
+                    <ICheck size={32} stroke={3.4} className="text-white" />
+                  </div>
+                  <div className="text-[16px] font-extrabold text-white mb-1 font-display">
+                    Bienvenue dans Premium !
+                  </div>
+                  <div className="text-[12.5px] text-white/65 mb-4">
+                    Vos fonctionnalités Premium sont actives.
+                  </div>
+                  <button
+                    onClick={close}
+                    className="tap btn-primary-green w-full py-3 rounded-xl text-[13.5px] font-bold"
+                  >
+                    Commencer
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-white/40">
+                <IShieldCheck size={11} /> Sécurisé · Aucune donnée bancaire stockée
+              </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
-          
-          {/* Message de blocage */}
-          {blockedFeature && (
-            <div className="mt-3 p-3 bg-red-500/20 rounded-xl">
-              <p className="text-red-300 text-sm">
-                {getBlockedMessage(blockedFeature)}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Plans */}
-        <div className="p-4 space-y-3">
-          {/* Plan Basic */}
-          <button
-            onClick={() => setSelectedPlan('basic')}
-            className={`w-full p-4 rounded-xl text-left transition-all ${
-              selectedPlan === 'basic'
-                ? 'bg-gradient-to-r from-blue-600 to-blue-500 border-2 border-blue-400'
-                : 'bg-slate-800 border-2 border-transparent hover:border-slate-600'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-blue-300" />
-                <span className="text-white font-bold">Basic</span>
-              </div>
-              <div className="text-right">
-                <span className="text-white font-bold text-lg">
-                  {formatPrice(PLANS.basic.price, PLANS.basic.currency)}
-                </span>
-                <span className="text-white/60 text-sm">/mois</span>
-              </div>
-            </div>
-            <ul className="space-y-1">
-              {PLANS.basic.features.slice(0, 4).map((feature, i) => (
-                <li key={i} className="flex items-center gap-2 text-white/80 text-sm">
-                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-          </button>
-
-          {/* Plan Pro - Recommandé */}
-          <button
-            onClick={() => setSelectedPlan('pro')}
-            className={`w-full p-4 rounded-xl text-left transition-all relative ${
-              selectedPlan === 'pro'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-500 border-2 border-purple-400'
-                : 'bg-slate-800 border-2 border-transparent hover:border-slate-600'
-            }`}
-          >
-            {/* Badge recommandé */}
-            <div className="absolute -top-2 right-4 px-2 py-0.5 bg-yellow-500 rounded-full">
-              <span className="text-black text-xs font-bold">POPULAIRE</span>
-            </div>
-            
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-yellow-300" />
-                <span className="text-white font-bold">Pro</span>
-              </div>
-              <div className="text-right">
-                <span className="text-white font-bold text-lg">
-                  {formatPrice(PLANS.pro.price, PLANS.pro.currency)}
-                </span>
-                <span className="text-white/60 text-sm">/mois</span>
-              </div>
-            </div>
-            <ul className="space-y-1">
-              {PLANS.pro.features.slice(0, 5).map((feature, i) => (
-                <li key={i} className="flex items-center gap-2 text-white/80 text-sm">
-                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-          </button>
-
-          {/* Plan Entreprise */}
-          <div className="p-4 bg-slate-800/50 rounded-xl border border-dashed border-slate-600">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-slate-400" />
-                <span className="text-white font-bold">Entreprise</span>
-              </div>
-              <span className="text-slate-400 text-sm">Sur devis</span>
-            </div>
-            <p className="text-slate-400 text-sm mt-2">
-              Solution complète pour les organisations avec dashboard, API et support dédié.
-            </p>
-            <button className="mt-2 text-blue-400 text-sm flex items-center gap-1">
-              Nous contacter <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Comparaison rapide */}
-        <div className="px-4 pb-4">
-          <div className="bg-slate-800/50 rounded-xl p-3">
-            <h4 className="text-white font-medium text-sm mb-2">
-              Comparaison Gratuit vs {selectedPlan === 'basic' ? 'Basic' : 'Pro'}
-            </h4>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="text-slate-400">Fonctionnalité</div>
-              <div className="text-slate-400">Gratuit</div>
-              <div className="text-yellow-400 font-medium">
-                {selectedPlan === 'basic' ? 'Basic' : 'Pro'}
-              </div>
-              
-              <div className="text-left text-slate-300">Contacts</div>
-              <div className="text-slate-400">3</div>
-              <div className="text-green-400">
-                {selectedPlan === 'basic' ? '10' : 'Illimité'}
-              </div>
-              
-              <div className="text-left text-slate-300">Enregistrement</div>
-              <div className="text-red-400">✕</div>
-              <div className="text-green-400">
-                {selectedPlan === 'basic' ? '5min' : '30min'}
-              </div>
-              
-              <div className="text-left text-slate-300">Communauté</div>
-              <div className="text-red-400">✕</div>
-              <div className="text-green-400">✓</div>
-              
-              <div className="text-left text-slate-300">WhatsApp</div>
-              <div className="text-red-400">✕</div>
-              <div className="text-green-400">✓</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Méthodes de paiement */}
-        <div className="px-4 pb-4">
-          <p className="text-slate-400 text-xs text-center mb-2">
-            Méthodes de paiement acceptées
-          </p>
-          <div className="flex justify-center gap-4">
-            <div className="px-3 py-1 bg-orange-500/20 rounded text-orange-400 text-xs">
-              Orange Money
-            </div>
-            <div className="px-3 py-1 bg-yellow-500/20 rounded text-yellow-400 text-xs">
-              MTN MoMo
-            </div>
-            <div className="px-3 py-1 bg-blue-500/20 rounded text-blue-400 text-xs">
-              Wave
-            </div>
-          </div>
-        </div>
-
-        {/* Bouton d'achat */}
-        <div className="sticky bottom-0 p-4 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800">
-          <button
-            onClick={handlePurchase}
-            disabled={isProcessing}
-            className="w-full py-4 bg-gradient-to-r from-yellow-500 to-orange-500 
-                       rounded-xl flex items-center justify-center gap-2
-                       disabled:opacity-50 disabled:cursor-not-allowed
-                       hover:from-yellow-400 hover:to-orange-400 transition-all"
-          >
-            {isProcessing ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span className="text-white font-bold">Traitement...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-5 h-5 text-white" />
-                <span className="text-white font-bold">
-                  S'abonner à {PLANS[selectedPlan].name} - {formatPrice(PLANS[selectedPlan].price, PLANS[selectedPlan].currency)}/mois
-                </span>
-              </>
-            )}
-          </button>
-          
-          <p className="text-slate-500 text-xs text-center mt-2">
-            Annulation possible à tout moment. Pas d'engagement.
-          </p>
         </div>
       </div>
     </div>

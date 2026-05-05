@@ -1,12 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
-      // Couleurs personnalisées pour SOS Africa
       colors: {
         emergency: {
           50: '#fef2f2',
@@ -20,65 +16,66 @@ export default {
           800: '#991b1b',
           900: '#7f1d1d',
           950: '#450a0a',
-        }
+        },
+        sos: {
+          bg: '#06080F',
+          'bg-2': '#0B0F1A',
+          'bg-3': '#04060B',
+          panel: 'rgba(255,255,255,0.04)',
+          stroke: 'rgba(255,255,255,0.08)',
+          text: '#F4F6FB',
+          dim: '#9AA3B6',
+          mute: '#5C6479',
+          red: '#FF2E3F',
+          'red-soft': '#FF5663',
+          green: '#22D67B',
+          'green-soft': '#3BE89A',
+          amber: '#FFB020',
+          gold: '#F4C24B',
+          'gold-2': '#E0A024',
+          blue: '#3D8BFF',
+          purple: '#A06BFF',
+        },
       },
-      // Animations personnalisées
       animation: {
         'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
         'bounce-slow': 'bounce 2s infinite',
         'spin-slow': 'spin 3s linear infinite',
+        'pulse-ring': 'pulse-ring 2.4s ease-out infinite',
+        'pulse-glow': 'pulse-glow 2.4s ease-in-out infinite',
+        'screen-in': 'screen-in 0.35s cubic-bezier(0.2,0.8,0.2,1) both',
       },
-      // Fonts
       fontFamily: {
-        sans: [
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'Segoe UI',
-          'Roboto',
-          'Helvetica Neue',
-          'Arial',
-          'sans-serif'
-        ],
-        mono: [
-          'SF Mono',
-          'Menlo',
-          'Monaco',
-          'Consolas',
-          'Liberation Mono',
-          'Courier New',
-          'monospace'
-        ]
+        sans: ['Manrope', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['Sora', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['SF Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
-      // Border radius plus grands pour un look moderne
       borderRadius: {
         '4xl': '2rem',
         '5xl': '2.5rem',
       },
-      // Ombres personnalisées
       boxShadow: {
-        'glow-red': '0 0 20px rgba(239, 68, 68, 0.5)',
-        'glow-green': '0 0 20px rgba(34, 197, 94, 0.5)',
-        'glow-blue': '0 0 20px rgba(59, 130, 246, 0.5)',
+        'glow-red': '0 0 20px rgba(255,46,63,0.55)',
+        'glow-green': '0 0 20px rgba(34,214,123,0.55)',
+        'glow-blue': '0 0 20px rgba(61,139,255,0.55)',
+        'glow-gold': '0 0 20px rgba(244,194,75,0.55)',
       },
-      // Spacing pour les safe areas
       spacing: {
         'safe-top': 'env(safe-area-inset-top)',
         'safe-bottom': 'env(safe-area-inset-bottom)',
         'safe-left': 'env(safe-area-inset-left)',
         'safe-right': 'env(safe-area-inset-right)',
       },
-      // Breakpoints adaptés au mobile
       screens: {
-        'xs': '320px',
-        'sm': '375px',
-        'md': '414px',
-        'lg': '768px',
-        'xl': '1024px',
+        xs: '320px',
+        sm: '375px',
+        md: '414px',
+        lg: '768px',
+        xl: '1024px',
       },
     },
   },
   plugins: [],
-  // Mode sombre par défaut
   darkMode: 'class',
-}
+};

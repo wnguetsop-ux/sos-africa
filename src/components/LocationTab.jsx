@@ -1,293 +1,338 @@
 import React, { useState } from 'react';
-import { 
-  MapPin, Share2, Copy, Phone, MessageCircle, 
-  Navigation, ExternalLink, Check, RefreshCw,
-  Shield, AlertTriangle
-} from 'lucide-react';
+import {
+  ISearch,
+  IX,
+  IAlert,
+  IBell,
+  ICar,
+  IRoute,
+  ILayers,
+  IPin,
+  IRefresh,
+  IArrowRight,
+  IShare,
+  IWhatsapp,
+  IMessage,
+  ICopy,
+} from './ui/icons';
+import { Tag } from './ui/atoms';
+import LeafletMap from './ui/LeafletMap';
+import { useReverseGeocode } from '../hooks/useReverseGeocode';
 
-const LocationTab = ({ location, gpsLoading, refreshGPS, t, isDark }) => {
+const LayerRow = ({ icon: Icn, color, label, defOn = false, onChange }) => {
+  const [on, setOn] = useState(defOn);
+  const c =
+    color === 'red'
+      ? 'var(--red)'
+      : color === 'green'
+      ? 'var(--green)'
+      : color === 'amber'
+      ? 'var(--amber)'
+      : 'var(--blue)';
+  const cls = color === 'green' ? 'green' : color === 'amber' ? 'amber' : '';
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div className="flex items-center gap-2.5">
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{
+            background: `color-mix(in oklab, ${c} 14%, transparent)`,
+            color: c,
+            border: `1px solid color-mix(in oklab, ${c} 32%, transparent)`,
+          }}
+        >
+          <Icn size={14} />
+        </div>
+        <div className="text-[13px] text-white/85">{label}</div>
+      </div>
+      <button
+        onClick={() => {
+          const next = !on;
+          setOn(next);
+          onChange && onChange(next);
+        }}
+        className={`switch ${cls} ${on ? 'on' : ''}`}
+        aria-label={label}
+      />
+    </div>
+  );
+};
+
+const LocationTab = ({ location, gpsLoading, refreshGPS, contacts, sendSMS, t }) => {
+  const [search, setSearch] = useState('');
   const [copied, setCopied] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
 
-  // Numéros d'urgence par pays
-  const emergencyNumbers = [
-    {
-      country: 'Cameroun',
-      flag: '🇨🇲',
-      numbers: [
-        { service: t('location.police'), number: '117', color: 'blue' },
-        { service: t('location.firemen'), number: '118', color: 'red' },
-        { service: t('location.gendarmerie'), number: '119', color: 'green' }
-      ]
-    },
-    {
-      country: t('location.ivoryCoast'),
-      flag: '🇨🇮',
-      numbers: [
-        { service: t('location.police'), number: '110', color: 'blue' },
-        { service: t('location.firemen'), number: '180', color: 'red' },
-        { service: 'SAMU', number: '185', color: 'green' }
-      ]
-    },
-    {
-      country: t('location.senegal'),
-      flag: '🇸🇳',
-      numbers: [
-        { service: t('location.police'), number: '17', color: 'blue' },
-        { service: t('location.firemen'), number: '18', color: 'red' },
-        { service: 'SAMU', number: '1515', color: 'green' }
-      ]
-    },
-    {
-      country: 'Gabon',
-      flag: '🇬🇦',
-      numbers: [
-        { service: t('location.police'), number: '1730', color: 'blue' },
-        { service: t('location.firemen'), number: '18', color: 'red' }
-      ]
-    },
-    {
-      country: 'Congo',
-      flag: '🇨🇬',
-      numbers: [
-        { service: t('location.police'), number: '117', color: 'blue' },
-        { service: t('location.firemen'), number: '118', color: 'red' }
-      ]
-    }
-  ];
+  const lat = location?.lat;
+  const lng = location?.lng;
+  const accuracy = location?.accuracy ? Math.round(location.accuracy) : null;
+  const { info, loading: geoLoading } = useReverseGeocode(location);
 
-  // Générer le lien Google Maps
-  const getMapsLink = () => {
-    if (!location) return '#';
-    return `https://www.google.com/maps?q=${location.lat},${location.lng}`;
-  };
+  const placeLine =
+    info?.line ||
+    (info?.neighbourhood
+      ? `${info.neighbourhood}${info.city ? ', ' + info.city : ''}`
+      : info?.city
+      ? `${info.city}${info.country ? ', ' + info.country : ''}`
+      : lat && lng
+      ? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      : '');
 
-  // Générer le message de partage
-  const getShareMessage = () => {
-    if (!location) return '';
-    return `📍 Ma position actuelle:\n\nLatitude: ${location.lat.toFixed(6)}\nLongitude: ${location.lng.toFixed(6)}\nPrécision: ${Math.round(location.accuracy)}m\n\n🗺️ Google Maps: ${getMapsLink()}\n\nEnvoyé via SOS Africa`;
-  };
+  const placeTitle = info?.neighbourhood || info?.city || '';
+  const placeSub = [info?.city, info?.country].filter(Boolean).join(', ');
 
-  // Copier la position
-  const copyPosition = async () => {
+  const mapsLink =
+    lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+  const directionsLink =
+    lat && lng
+      ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+      : '#';
+
+  const handleCopy = async () => {
+    if (!mapsLink) return;
     try {
-      await navigator.clipboard.writeText(getShareMessage());
+      await navigator.clipboard.writeText(`📍 Ma position SOS Africa : ${mapsLink}`);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      // Fallback
-      const textArea = document.createElement('textarea');
-      textArea.value = getShareMessage();
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+      setTimeout(() => setCopied(false), 1800);
+    } catch {}
   };
 
-  // Partager via SMS
-  const shareSMS = () => {
-    const message = encodeURIComponent(getShareMessage());
-    window.open(`sms:?body=${message}`, '_blank');
-    setShareSuccess(true);
-    setTimeout(() => setShareSuccess(false), 2000);
+  const handleSMSAll = () => {
+    if (!sendSMS || !contacts || contacts.length === 0 || !mapsLink) return;
+    sendSMS(contacts, `📍 SOS Africa — Ma position : ${mapsLink}`);
   };
 
-  // Partager via WhatsApp
-  const shareWhatsApp = () => {
-    const message = encodeURIComponent(getShareMessage());
-    window.open(`https://wa.me/?text=${message}`, '_blank');
-    setShareSuccess(true);
-    setTimeout(() => setShareSuccess(false), 2000);
+  const handleWhatsApp = () => {
+    if (!mapsLink) return;
+    const text = encodeURIComponent(`📍 SOS Africa — Ma position : ${mapsLink}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
   };
-
-  // Appeler un numéro
-  const callNumber = (number) => {
-    window.open(`tel:${number}`, '_blank');
-  };
-
-  const bgCard = isDark ? 'bg-slate-800/50' : 'bg-white';
-  const borderColor = isDark ? 'border-slate-700' : 'border-slate-200';
-  const textColor = isDark ? 'text-white' : 'text-slate-900';
-  const textSecondary = isDark ? 'text-slate-400' : 'text-slate-600';
 
   return (
-    <div className="p-4 space-y-4 pb-24">
-      {/* Titre */}
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-          <MapPin className="w-5 h-5 text-blue-400" />
+    <div className="screen-in pb-32">
+      {/* Search / current address */}
+      <div className="px-5 pb-3">
+        <div
+          className="glass rounded-2xl flex items-center gap-2 px-3.5 py-2.5"
+          style={{ borderColor: 'var(--stroke)' }}
+        >
+          <ISearch size={16} className="text-white/55" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent outline-none text-[13.5px] text-white placeholder-white/40 w-full"
+            placeholder={
+              placeLine ||
+              (t ? t('location.searchPlaceholder') || 'Rechercher un lieu' : 'Rechercher un lieu')
+            }
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="tap text-white/45">
+              <IX size={14} />
+            </button>
+          )}
         </div>
-        <h1 className={`text-2xl font-bold ${textColor}`}>{t('location.title')}</h1>
-      </div>
 
-      {/* Carte de position */}
-      <div className={`${bgCard} rounded-2xl p-4 border ${borderColor}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className={`font-semibold ${textColor}`}>{t('location.currentPosition')}</h3>
-          <button 
-            onClick={refreshGPS}
-            disabled={gpsLoading}
-            className="p-2 bg-blue-500/20 rounded-lg hover:bg-blue-500/30 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 text-blue-400 ${gpsLoading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        {location ? (
-          <div className="space-y-3">
-            {/* Coordonnées */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-100'} rounded-xl p-3`}>
-                <p className={`text-xs ${textSecondary} mb-1`}>{t('home.latitude')}</p>
-                <p className={`text-lg font-mono font-bold ${textColor}`}>{location.lat.toFixed(6)}</p>
+        {(placeTitle || placeSub) && (
+          <div className="mt-2 flex items-center gap-2 px-1">
+            <IPin size={13} className="text-[color:var(--blue)]" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12.5px] font-bold text-white truncate">
+                {placeTitle || (geoLoading ? 'Recherche…' : '—')}
               </div>
-              <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-100'} rounded-xl p-3`}>
-                <p className={`text-xs ${textSecondary} mb-1`}>{t('home.longitude')}</p>
-                <p className={`text-lg font-mono font-bold ${textColor}`}>{location.lng.toFixed(6)}</p>
+              {placeSub && (
+                <div className="text-[10.5px] text-white/55 truncate">{placeSub}</div>
+              )}
+            </div>
+            {accuracy && (
+              <div
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                style={{
+                  color: 'var(--green)',
+                  background: 'rgba(34,214,123,.10)',
+                  border: '1px solid rgba(34,214,123,.30)',
+                }}
+              >
+                ±{accuracy}m
               </div>
-            </div>
-
-            {/* Précision */}
-            <div className={`flex items-center justify-between ${isDark ? 'bg-slate-900/50' : 'bg-slate-100'} rounded-xl p-3`}>
-              <div className="flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-blue-400" />
-                <span className={`text-sm ${textSecondary}`}>{t('home.accuracy')}</span>
-              </div>
-              <span className={`font-semibold ${
-                location.accuracy <= 10 ? 'text-green-400' : 
-                location.accuracy <= 50 ? 'text-yellow-400' : 'text-red-400'
-              }`}>
-                {Math.round(location.accuracy)} {t('home.meters')}
-              </span>
-            </div>
-
-            {/* Lien Google Maps */}
-            <a
-              href={getMapsLink()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 p-3 bg-blue-600 rounded-xl text-white font-medium hover:bg-blue-500 transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-              {t('alert.viewOnMaps')}
-            </a>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center p-8">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className={textSecondary}>{t('home.searchingGps')}</p>
-            </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Partager la position */}
-      {location && (
-        <div className={`${bgCard} rounded-2xl p-4 border ${borderColor}`}>
-          <h3 className={`font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-            <Share2 className="w-4 h-4 text-green-400" />
-            {t('location.sharePosition')}
-          </h3>
+      {/* Real interactive map */}
+      <div
+        className="mx-5 rounded-2xl relative overflow-hidden glass"
+        style={{ height: 380, borderColor: 'var(--stroke)' }}
+      >
+        <LeafletMap lat={lat} lng={lng} height={380} className="w-full h-full" />
+        {gpsLoading && (
+          <div
+            className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10.5px] font-bold flex items-center gap-1.5 glass z-[1000]"
+            style={{ color: 'var(--amber)', borderColor: 'rgba(255,176,32,.35)' }}
+          >
+            <IRefresh size={11} className="animate-spin" />
+            {t ? t('location.searching') || 'Recherche GPS…' : 'Recherche GPS…'}
+          </div>
+        )}
+        <button
+          onClick={refreshGPS}
+          className="tap absolute right-3 bottom-3 w-10 h-10 rounded-full glass flex items-center justify-center text-white halo-blue z-[1000]"
+          style={{ borderColor: 'rgba(255,255,255,.12)' }}
+          aria-label="Recentrer"
+          disabled={gpsLoading}
+        >
+          <IRefresh size={18} className={gpsLoading ? 'animate-spin' : ''} />
+        </button>
+      </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            {/* SMS */}
+      {/* Share location */}
+      <div className="px-5 mt-3">
+        <div className="glass rounded-2xl p-3.5" style={{ borderColor: 'var(--stroke)' }}>
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{
+                  background: 'rgba(61,139,255,.15)',
+                  color: 'var(--blue)',
+                  border: '1px solid rgba(61,139,255,.35)',
+                }}
+              >
+                <IShare size={14} />
+              </div>
+              <div className="text-[13px] font-bold text-white">
+                {t ? t('contacts.shareLocation') || 'Partager ma position' : 'Partager ma position'}
+              </div>
+            </div>
+            <Tag color="blue">Live</Tag>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={shareSMS}
-              className="flex flex-col items-center gap-2 p-3 bg-blue-500/20 rounded-xl hover:bg-blue-500/30 transition-colors"
+              onClick={handleSMSAll}
+              disabled={!mapsLink || !contacts?.length}
+              className="tap glass rounded-xl py-2 text-[11.5px] font-bold flex items-center justify-center gap-1.5 halo-green text-white/85 disabled:opacity-50"
+              style={{ borderColor: 'var(--stroke)' }}
             >
-              <MessageCircle className="w-6 h-6 text-blue-400" />
-              <span className={`text-xs ${textColor}`}>{t('location.sms')}</span>
+              <IMessage size={13} /> SMS
             </button>
-
-            {/* WhatsApp */}
             <button
-              onClick={shareWhatsApp}
-              className="flex flex-col items-center gap-2 p-3 bg-green-500/20 rounded-xl hover:bg-green-500/30 transition-colors"
+              onClick={handleWhatsApp}
+              disabled={!mapsLink}
+              className="tap glass rounded-xl py-2 text-[11.5px] font-bold flex items-center justify-center gap-1.5 halo-green text-white/85 disabled:opacity-50"
+              style={{ borderColor: 'var(--stroke)' }}
             >
-              <MessageCircle className="w-6 h-6 text-[#25D366]" />
-              <span className={`text-xs ${textColor}`}>{t('location.whatsapp')}</span>
+              <IWhatsapp size={13} className="text-[color:var(--green)]" /> WhatsApp
             </button>
-
-            {/* Copier */}
             <button
-              onClick={copyPosition}
-              className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-colors ${
-                copied 
-                  ? 'bg-green-500/20' 
-                  : isDark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'
-              }`}
+              onClick={handleCopy}
+              disabled={!mapsLink}
+              className="tap glass rounded-xl py-2 text-[11.5px] font-bold flex items-center justify-center gap-1.5 halo-blue text-white/85 disabled:opacity-50"
+              style={{ borderColor: 'var(--stroke)' }}
             >
-              {copied ? (
-                <Check className="w-6 h-6 text-green-400" />
-              ) : (
-                <Copy className="w-6 h-6 text-slate-400" />
-              )}
-              <span className={`text-xs ${textColor}`}>
-                {copied ? t('location.copied') : t('location.copy')}
-              </span>
+              <ICopy size={13} /> {copied ? 'Copié' : 'Copier'}
             </button>
           </div>
+        </div>
+      </div>
 
-          {shareSuccess && (
-            <div className="mt-3 p-2 bg-green-500/20 rounded-lg text-center">
-              <p className="text-green-400 text-sm">{t('location.positionShared')}</p>
+      {/* Secure route */}
+      <div className="px-5 mt-3">
+        <div className="glass rounded-2xl p-3.5 ring-green relative overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{
+                  background: 'rgba(34,214,123,.16)',
+                  color: 'var(--green)',
+                  border: '1px solid rgba(34,214,123,.4)',
+                }}
+              >
+                <IRoute size={15} />
+              </div>
+              <div className="text-[13.5px] font-bold text-white">
+                {t ? t('location.secureRoute') || 'Itinéraire sécurisé' : 'Itinéraire sécurisé'}
+              </div>
             </div>
-          )}
+            <Tag color="green">
+              {t ? t('location.recommended') || 'Recommandé' : 'Recommandé'}
+            </Tag>
+          </div>
+          <div className="text-[12px] text-white/60 mb-3">
+            {t
+              ? t('location.routeDesc') ||
+                'Ouvre Google Maps avec votre destination pour le trajet le plus sûr.'
+              : 'Ouvre Google Maps avec votre destination pour le trajet le plus sûr.'}
+          </div>
+          <a
+            href={directionsLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tap btn-primary-green w-full py-3 rounded-xl font-bold text-[14px] flex items-center justify-center gap-2"
+          >
+            {t ? t('location.openRoute') || "Voir l'itinéraire" : "Voir l'itinéraire"}{' '}
+            <IArrowRight size={16} />
+          </a>
+        </div>
+      </div>
+
+      {/* Layers */}
+      <div className="px-5 mt-3">
+        <div className="glass rounded-2xl p-3.5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <ILayers size={15} className="text-white/70" />
+            <div className="text-[13px] font-bold text-white/90">
+              {t ? t('location.layers') || 'Couches de la carte' : 'Couches de la carte'}
+            </div>
+          </div>
+          <LayerRow icon={IAlert} color="red" label={t ? t('location.riskZones') || 'Zones à risque' : 'Zones à risque'} defOn />
+          <LayerRow icon={IAlert} color="amber" label={t ? t('location.cautionZones') || 'Zones de vigilance' : 'Zones de vigilance'} defOn />
+          <LayerRow icon={IRoute} color="green" label={t ? t('location.secureRoutes') || 'Itinéraires sécurisés' : 'Itinéraires sécurisés'} defOn />
+          <LayerRow icon={IBell} color="red" label={t ? t('location.liveAlerts') || 'Alertes en direct' : 'Alertes en direct'} defOn />
+          <LayerRow icon={ICar} color="blue" label={t ? t('location.traffic') || 'Trafic en temps réel' : 'Trafic en temps réel'} />
+        </div>
+      </div>
+
+      {/* Coords */}
+      {lat !== undefined && lng !== undefined && (
+        <div className="px-5 mt-3">
+          <div className="glass rounded-2xl p-3.5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[13px] font-bold text-white/90">
+                {t ? t('location.coords') || 'Coordonnées GPS' : 'Coordonnées GPS'}
+              </div>
+              <button
+                onClick={refreshGPS}
+                className="tap w-8 h-8 rounded-lg glass flex items-center justify-center text-white/70 halo-blue"
+                style={{ borderColor: 'var(--stroke)' }}
+                disabled={gpsLoading}
+              >
+                <IRefresh size={14} className={gpsLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--stroke)' }}
+              >
+                <div className="text-[10.5px] text-white/55 mb-1 uppercase tracking-wider font-bold">
+                  Latitude
+                </div>
+                <div className="text-[16px] font-mono font-bold text-white">{lat.toFixed(6)}</div>
+              </div>
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--stroke)' }}
+              >
+                <div className="text-[10.5px] text-white/55 mb-1 uppercase tracking-wider font-bold">
+                  Longitude
+                </div>
+                <div className="text-[16px] font-mono font-bold text-white">{lng.toFixed(6)}</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Numéros d'urgence */}
-      <div className={`${bgCard} rounded-2xl p-4 border ${borderColor}`}>
-        <h3 className={`font-semibold ${textColor} mb-4 flex items-center gap-2`}>
-          <AlertTriangle className="w-4 h-4 text-red-400" />
-          {t('location.emergencyNumbers')}
-        </h3>
-
-        <div className="space-y-4">
-          {emergencyNumbers.map((country, idx) => (
-            <div key={idx}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">{country.flag}</span>
-                <span className={`font-medium ${textColor}`}>{country.country}</span>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-2">
-                {country.numbers.map((num, nIdx) => (
-                  <button
-                    key={nIdx}
-                    onClick={() => callNumber(num.number)}
-                    className={`p-2 rounded-xl text-center transition-all hover:scale-105 ${
-                      num.color === 'blue' ? 'bg-blue-500/20 hover:bg-blue-500/30' :
-                      num.color === 'red' ? 'bg-red-500/20 hover:bg-red-500/30' :
-                      'bg-green-500/20 hover:bg-green-500/30'
-                    }`}
-                  >
-                    <p className={`text-lg font-bold ${
-                      num.color === 'blue' ? 'text-blue-400' :
-                      num.color === 'red' ? 'text-red-400' :
-                      'text-green-400'
-                    }`}>
-                      {num.number}
-                    </p>
-                    <p className={`text-[10px] ${textSecondary}`}>{num.service}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="text-center pt-2">
-        <p className={`text-xs ${textSecondary}`}>
-          🛡️ {t('home.worksOffline')}
-        </p>
-      </div>
     </div>
   );
 };
