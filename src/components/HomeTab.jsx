@@ -9,6 +9,8 @@ import {
   IWifiOff,
   IMask,
   ILightning,
+  ICar,
+  IChevronRight,
 } from './ui/icons';
 import { StatusRow, SectionTitle } from './ui/atoms';
 import { useReverseGeocode } from '../hooks/useReverseGeocode';
@@ -189,11 +191,14 @@ const HomeTab = ({
   onTriggerSOS,
   onTriggerSilent,
   onNav,
+  onOpenTaxi,
   userName,
   journeyActive,
   recordingActive,
+  taxiRide,
   t,
 }) => {
+  const taxiActive = !!taxiRide?.activeRide;
   const { info: geoInfo } = useReverseGeocode(location);
   const placeShort =
     geoInfo?.neighbourhood ||
@@ -282,6 +287,51 @@ const HomeTab = ({
           </div>
         )}
       </div>
+
+      {/* Active taxi ride banner — gros, visible, cliquable */}
+      {taxiActive && (
+        <button
+          onClick={onOpenTaxi}
+          className="mx-5 mb-2 tap rounded-2xl p-3 flex items-center gap-3 text-left relative overflow-hidden"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(255,176,32,.20), rgba(255,176,32,.06))',
+            border: '1px solid rgba(255,176,32,.5)',
+            boxShadow: '0 8px 24px rgba(255,176,32,.25)',
+          }}
+        >
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: 'linear-gradient(180deg,#FFC861,#D9971C)',
+              color: '#241500',
+              boxShadow: '0 0 18px rgba(255,176,32,.55)',
+            }}
+          >
+            <ICar size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13.5px] font-extrabold text-white flex items-center gap-1.5">
+              Trajet taxi en cours
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full"
+                style={{
+                  background: 'var(--amber)',
+                  boxShadow: '0 0 8px var(--amber)',
+                  animation: 'blink 1.4s infinite',
+                }}
+              />
+            </div>
+            <div className="text-[11px] text-white/75 truncate">
+              {taxiRide.activeRide.plateText || '(plaque)'}
+              {taxiRide.activeRide.destination &&
+                ` → ${taxiRide.activeRide.destination}`}{' '}
+              · {taxiRide.elapsedMin} min écoulées
+            </div>
+          </div>
+          <IChevronRight size={16} className="text-white/45 shrink-0" />
+        </button>
+      )}
 
       {(journeyActive || recordingActive) && (
         <div className="px-5 mb-1 flex gap-2 justify-center flex-wrap">

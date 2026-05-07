@@ -17,6 +17,7 @@ import { useAnalytics } from './hooks/useAnalytics';
 import { usePremiumStatus } from './hooks/usePremiumStatus';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { useGeofences } from './hooks/useGeofences';
+import { useTaxiRide } from './hooks/useTaxiRide';
 
 // New design components
 import AppHeader from './components/ui/AppHeader';
@@ -192,6 +193,9 @@ const App = () => {
     userName: userProfile.getFullName?.() || userProfile.firstName || userId,
     enabled: isPremium && !!familyId,
   });
+
+  // Taxi ride monitoring (always-on, persisted in localStorage)
+  const taxiRide = useTaxiRide({ contacts, sendSMS, location });
 
   // Shake detection
   const handleShake = useCallback(() => {
@@ -491,9 +495,11 @@ const App = () => {
             onTriggerSOS={() => triggerSOS('sos')}
             onTriggerSilent={handleSilentSOS}
             onNav={setActiveTab}
+            onOpenTaxi={() => setActiveTab('tools')}
             userName={userProfile.getFullName?.()}
             journeyActive={journeyHook.isActive}
             recordingActive={audioRecording.isRecording}
+            taxiRide={taxiRide}
             t={t}
           />
         )}
@@ -528,6 +534,7 @@ const App = () => {
             isPremium={isPremium}
             premiumLimits={premiumLimits}
             onUpgrade={() => setShowPremium(true)}
+            taxiRide={taxiRide}
           />
         )}
 

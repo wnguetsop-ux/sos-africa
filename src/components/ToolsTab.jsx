@@ -24,6 +24,7 @@ import VideoSheet from './sheets/VideoSheet';
 import FamilySheet from './sheets/FamilySheet';
 import AISheet from './sheets/AISheet';
 import GeofencesSheet from './sheets/GeofencesSheet';
+import TaxiSafeSheet from './sheets/TaxiSafeSheet';
 import PremiumGate from './ui/PremiumGate';
 
 const ACCENT = {
@@ -109,6 +110,7 @@ const ToolsTab = ({
   isPremium = false,
   premiumLimits = null,
   onUpgrade,
+  taxiRide,
 }) => {
   const [activeSheet, setActiveSheet] = useState(null);
   const [selectedCaller, setSelectedCaller] = useState('Maman');
@@ -269,6 +271,19 @@ const ToolsTab = ({
       badge: !isPremium ? 'PREMIUM' : null,
     },
     {
+      id: 'taxi',
+      icon: ICar,
+      color: 'amber',
+      title: 'Mode Taxi Safe',
+      desc: 'Avant de monter : photo plaque + check-in toutes les 3 min.',
+      onClick: () => setActiveSheet('taxi'),
+      badge: taxiRide?.activeRide
+        ? 'EN COURS'
+        : !isPremium
+        ? 'PREMIUM'
+        : null,
+    },
+    {
       id: 'family',
       icon: IFamily,
       color: 'blue',
@@ -383,6 +398,7 @@ const ToolsTab = ({
                 {activeSheet === 'video' ? 'SOS vidéo live' : null}
                 {activeSheet === 'ai' ? 'Assistant IA' : null}
                 {activeSheet === 'geofences' ? 'Zones de confiance' : null}
+                {activeSheet === 'taxi' ? 'Mode Taxi Safe' : null}
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-6"
@@ -549,6 +565,34 @@ const ToolsTab = ({
                 }}
                 onClose={closeSheet}
               />
+            )}
+
+            {activeSheet === 'taxi' && (
+              <PremiumGate
+                isPremium={isPremium}
+                title="Mode Taxi Safe"
+                description="Pour ne plus jamais monter dans un taxi sans filet : photo de la plaque + suivi auto + alerte si tu ne réponds pas."
+                benefits={[
+                  'Photo plaque sauvegardée en cloud',
+                  'Check-in auto toutes les 3 min',
+                  'SMS d\'alerte automatique si pas de réponse',
+                  'Historique de tous tes trajets',
+                  'Bouton SOS d\'urgence pendant le trajet',
+                ]}
+                onUpgrade={() => {
+                  closeSheet();
+                  setTimeout(() => onUpgrade && onUpgrade(), 80);
+                }}
+              >
+                <TaxiSafeSheet
+                  contacts={contacts}
+                  sendSMS={sendSMS}
+                  location={location}
+                  userProfile={userProfile}
+                  taxiRide={taxiRide}
+                  onClose={closeSheet}
+                />
+              </PremiumGate>
             )}
 
             {activeSheet === 'geofences' && (
