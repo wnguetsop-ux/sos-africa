@@ -322,6 +322,18 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Listen for cross-tab navigation events
+  const [pendingSheet, setPendingSheet] = useState(null);
+  useEffect(() => {
+    const onNav = (e) => {
+      const { tab, sheet } = e.detail || {};
+      if (tab) setActiveTab(tab);
+      if (sheet) setPendingSheet(sheet);
+    };
+    window.addEventListener('sos-africa:nav', onNav);
+    return () => window.removeEventListener('sos-africa:nav', onNav);
+  }, []);
+
   // Trigger SOS
   const triggerSOS = (type = 'sos') => {
     setAlertActive(true);
@@ -355,7 +367,7 @@ const App = () => {
     if (navigator.vibrate) navigator.vibrate(0);
   };
 
-  // Execute emergency actions
+  // Execute emergency actions — automatique sans page blanche
   const executeEmergencyActions = async () => {
     const message = userProfile.generateAlertMessage(location);
     alertHistory.addAlert({
@@ -366,12 +378,49 @@ const App = () => {
       method: 'sms',
     });
     analytics.trackAlert('sos');
+
+    // 1) Push FCM aux contacts qui ont l'app + à la famille (instantané, gratuit, pas de page blanche)
+    const userIds = (contacts || [])
+      .map((c) => c.id || c.name)
+      .filter(Boolean);
     try {
-      await sendSMS(contacts, message);
-    } catch (error) {
-      console.error('Erreur SMS:', error);
-    }
+      fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIds,
+          familyId,
+          title: '🆘 ALERTE SOS',
+          body: `${userProfile.getFullName?.() || userId} a déclenché une alerte d'urgence`,
+          data: {
+            url: location ? `https://www.google.com/maps?q=${location.lat},${location.lng}` : '/',
+            type: 'sos',
+            urgent: 'true',
+          },
+        }),
+      }).catch(() => {});
+    } catch {}
+
+    // 2) Logger dans Firestore pour les contacts qui n'ont pas l'app (admin verra)
+    try {
+      const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('./firebase/config');
+      addDoc(collection(db, 'sosAlerts'), {
+        userId,
+        userName: userProfile.getFullName?.() || userId,
+        message,
+        location: location || null,
+        contactIds: userIds,
+        sentAt: serverTimestamp(),
+        method: 'auto_push',
+      }).catch(() => {});
+    } catch {}
+
+    // 3) Vibration confirmation
     if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 1000]);
+
+    // PAS de window.open(sms:) → plus de page blanche
+    // L'utilisateur peut envoyer SMS/WhatsApp manuellement depuis l'écran de succès
   };
 
   const handleFakeCall = (caller, delay) => {
@@ -535,6 +584,8 @@ const App = () => {
             premiumLimits={premiumLimits}
             onUpgrade={() => setShowPremium(true)}
             taxiRide={taxiRide}
+            pendingSheet={pendingSheet}
+            onPendingSheetConsumed={() => setPendingSheet(null)}
           />
         )}
 

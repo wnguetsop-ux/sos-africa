@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   IVideo,
   IMask,
@@ -115,6 +115,8 @@ const ToolsTab = ({
   premiumLimits = null,
   onUpgrade,
   taxiRide,
+  pendingSheet,
+  onPendingSheetConsumed,
 }) => {
   const [activeSheet, setActiveSheet] = useState(null);
   const [selectedCaller, setSelectedCaller] = useState('Maman');
@@ -216,6 +218,30 @@ const ToolsTab = ({
       setTimeout(() => setPlateSentToast(false), 3000);
     }
   };
+
+  // Honor pending sheet from external nav (e.g. from ChildTracker → 'family')
+  useEffect(() => {
+    if (pendingSheet) {
+      setActiveSheet(pendingSheet);
+      onPendingSheetConsumed && onPendingSheetConsumed();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSheet]);
+
+  // Lock body scroll + force scroll-top quand une sheet s'ouvre, restore a la fermeture
+  useEffect(() => {
+    if (activeSheet) {
+      const prevOverflow = document.body.style.overflow;
+      const prevScrollY = window.scrollY;
+      document.body.style.overflow = 'hidden';
+      // Le contenu de la sheet doit demarrer en haut
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      return () => {
+        document.body.style.overflow = prevOverflow;
+        window.scrollTo({ top: prevScrollY, behavior: 'instant' });
+      };
+    }
+  }, [activeSheet]);
 
   const closeSheet = () => {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());

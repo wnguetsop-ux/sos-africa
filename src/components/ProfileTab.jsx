@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ActivationCodeSheet from './sheets/ActivationCodeSheet';
+import ChildTrackerSheet from './sheets/ChildTrackerSheet';
 import {
   IShield,
   IBell,
@@ -613,97 +614,15 @@ const ProfileTab = ({
 
       {/* Child tracker preview modal */}
       {showChildTracker && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <div
-            className="absolute inset-0"
-            style={{ background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(10px)' }}
-            onClick={() => setShowChildTracker(false)}
-          />
-          <div className="relative w-full max-w-md glass-strong rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <IFamily size={18} className="text-[color:var(--blue)]" />
-                <div className="text-[16px] font-extrabold text-white font-display">
-                  Suivi enfant · Mode famille
-                </div>
-              </div>
-              <button
-                onClick={() => setShowChildTracker(false)}
-                className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
-                style={{ borderColor: 'var(--stroke)' }}
-              >
-                <ICrown size={14} className="text-[color:var(--gold)]" />
-              </button>
-            </div>
-
-            <p className="text-[12px] text-white/65 mb-3">
-              Reliez les téléphones de vos enfants pour voir leur position en direct, recevoir une alerte s'ils s'éloignent d'une zone définie ou s'ils restent immobiles trop longtemps dans un endroit isolé.
-            </p>
-
-            <div className="space-y-2 mb-4">
-              {[
-                { name: 'Aïcha (10 ans)', place: 'École Saint-Joseph, Yaoundé', status: 'En sécurité', color: 'var(--green)', icon: '👧' },
-                { name: 'Théo (14 ans)', place: 'Quartier Bastos · zone surveillée', status: 'Hors zone', color: 'var(--amber)', icon: '👦' },
-              ].map((child, i) => (
-                <div key={i} className="glass rounded-2xl p-3 flex items-center gap-3"
-                     style={{ borderColor: 'var(--stroke)' }}>
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-2xl"
-                       style={{
-                         background: `linear-gradient(135deg, ${child.color}, #1a1a1a)`,
-                       }}>
-                    {child.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13.5px] font-bold text-white truncate">{child.name}</div>
-                    <div className="text-[11px] text-white/55 truncate">
-                      <IPin size={10} className="inline mr-0.5" />
-                      {child.place}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                          style={{
-                            color: child.color,
-                            background: `color-mix(in oklab, ${child.color} 14%, transparent)`,
-                            border: `1px solid color-mix(in oklab, ${child.color} 35%, transparent)`,
-                          }}>
-                      {child.status}
-                    </span>
-                    <button className="tap w-8 h-8 rounded-full flex items-center justify-center"
-                            style={{
-                              background: 'rgba(61,139,255,.14)',
-                              color: 'var(--blue)',
-                              border: '1px solid rgba(61,139,255,.35)',
-                            }}
-                            aria-label="Envoyer un signal">
-                      <ISend size={13} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="glass rounded-2xl p-3 mb-3" style={{ borderColor: 'var(--stroke)' }}>
-              <div className="text-[12px] font-bold text-white mb-1">Push « ça va ? »</div>
-              <div className="text-[11px] text-white/60 mb-2">
-                Envoyez un signal à votre enfant : il reçoit une notification et doit confirmer qu'il va bien. Sans réponse en 5 min, ses contacts d'urgence sont alertés.
-              </div>
-              <button className="tap btn-primary-gold w-full py-2.5 rounded-xl text-[12.5px] font-extrabold flex items-center justify-center gap-1.5">
-                <ISend size={14} /> Envoyer maintenant
-              </button>
-            </div>
-
-            <button
-              onClick={onUpgrade}
-              className="tap btn-primary-gold w-full py-3 rounded-xl text-[13.5px] font-extrabold flex items-center justify-center gap-2 font-display"
-            >
-              <ICrown size={15} /> Activer Premium pour suivre vos enfants
-            </button>
-            <div className="text-[10.5px] text-white/45 text-center mt-2">
-              Données fictives · Premium requis pour la connexion réelle
-            </div>
-          </div>
-        </div>
+        <ChildTrackerSheet
+          userProfile={userProfile}
+          isPremium={isPremium}
+          onUpgrade={() => {
+            setShowChildTracker(false);
+            setTimeout(() => onUpgrade && onUpgrade(), 100);
+          }}
+          onClose={() => setShowChildTracker(false)}
+        />
       )}
 
       {/* Code-word SOS modal */}
