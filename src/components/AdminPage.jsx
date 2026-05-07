@@ -1,531 +1,1018 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BarChart3, Users, Download, Eye, Clock, 
-  MapPin, Shield, TrendingUp, Calendar, 
-  Activity, Smartphone, Globe, ChevronRight,
-  Lock, X, RefreshCw, AlertTriangle, Zap,
-  Heart, Phone, Mic, Moon, Navigation, Bell
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  IShield,
+  IX,
+  ICrown,
+  ICheck,
+  IAlert,
+  IBell,
+  IPin,
+  IUser,
+  ISearch,
+  ICopy,
+  IPlus,
+  IRefresh,
+  ITrash,
+  IInfo,
+  IChevronRight,
+  IClock,
+  IShare,
+} from './ui/icons';
+import { db } from '../firebase/config';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  orderBy,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  addDoc,
+} from 'firebase/firestore';
 
-// Code d'accès admin - CHANGEZ CECI !
-const ADMIN_CODE = 'sosadmin2024';
+// PIN admin — peut être surchargé via VITE_ADMIN_PIN dans Vercel.
+// Le 5-tap sur le logo donne déjà un accès secret ; ce PIN ajoute une couche.
+const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '2026';
 
-const AdminPage = ({ onClose }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [code, setCode] = useState('');
-  const [error, setError] = useState('');
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+// XAF par plan
+const PLAN_XAF = { monthly: 1300, yearly: 12500, family: 3300 };
+const PLAN_DAYS = { monthly: 30, yearly: 365, family: 30 };
+const PLAN_LABEL = { monthly: 'Mensuel', yearly: 'Annuel', family: 'Famille' };
 
-  useEffect(() => {
-    const auth = localStorage.getItem('sos_admin_auth');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, []);
+const fmtDate = (ms) => {
+  if (!ms) return '—';
+  return new Date(ms).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadStats();
-      // Rafraîchir toutes les 30 secondes
-      const interval = setInterval(loadStats, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated]);
+const daysLeft = (ms) => {
+  if (!ms) return 0;
+  return Math.max(0, Math.floor((ms - Date.now()) / (24 * 60 * 60 * 1000)));
+};
 
-  const handleAuth = () => {
-    if (code === ADMIN_CODE) {
-      setIsAuthenticated(true);
-      setError('');
-      localStorage.setItem('sos_admin_auth', 'true');
-    } else {
-      setError('Code incorrect');
-      setCode('');
-    }
-  };
+const fmtRelative = (ms) => {
+  if (!ms) return '—';
+  const diff = (Date.now() - ms) / 1000;
+  if (diff < 60) return 'à l\'instant';
+  if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
+  return `il y a ${Math.floor(diff / 86400)} j`;
+};
 
-  const loadStats = () => {
-    setLoading(true);
-    
-    // Récupérer les stats depuis localStorage
-    const appStats = JSON.parse(localStorage.getItem('sos_app_stats') || '{}');
-    const sessionStats = JSON.parse(localStorage.getItem('sos_session_stats') || '{}');
-    
-    // Calculer les stats
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    
-    // Historique des visites par jour
-    const visitHistory = JSON.parse(localStorage.getItem('sos_visit_history') || '{}');
-    if (!visitHistory[today]) {
-      visitHistory[today] = 0;
-    }
-    visitHistory[today]++;
-    localStorage.setItem('sos_visit_history', JSON.stringify(visitHistory));
+const tsToMs = (ts) => ts?.toMillis?.() || ts?.seconds * 1000 || ts || null;
 
-    // Compiler les statistiques
-    const compiledStats = {
-      // Utilisateurs
-      totalUsers: appStats.totalUsers || 1,
-      activeToday: Object.keys(visitHistory).filter(d => d === today).length > 0 ? visitHistory[today] : 0,
-      newUsersToday: appStats.newUsersToday || 0,
-      
-      // Engagement
-      totalSessions: appStats.totalSessions || 1,
-      avgSessionTime: appStats.avgSessionTime || '2:30',
-      totalPageViews: appStats.totalPageViews || 0,
-      
-      // Fonctionnalités
-      features: {
-        sosButton: appStats.features?.sos || 0,
-        shakeAlert: appStats.features?.shake || 0,
-        ghostMode: appStats.features?.ghost || 0,
-        fakeCall: appStats.features?.fakecall || 0,
-        audioRecord: appStats.features?.recording || 0,
-        journeyMode: appStats.features?.journey || 0,
-        sirenMode: appStats.features?.siren || 0,
-      },
-      
-      // Alertes
-      totalAlerts: appStats.alertsSent || 0,
-      alertsToday: appStats.alertsToday || 0,
-      cancelledAlerts: appStats.cancelledAlerts || 0,
-      
-      // Géographie
-      countries: appStats.countries || {
-        'Cameroun': Math.floor(Math.random() * 50) + 10,
-        'France': Math.floor(Math.random() * 30) + 5,
-        'Côte d\'Ivoire': Math.floor(Math.random() * 20) + 3,
-        'Sénégal': Math.floor(Math.random() * 15) + 2,
-        'Belgique': Math.floor(Math.random() * 10) + 1,
-      },
-      
-      // Donations
-      donations: appStats.donations || {
-        total: 0,
-        count: 0,
-        lastDonation: null
-      },
-      
-      // Historique des 7 derniers jours
-      dailyStats: Object.entries(visitHistory)
-        .slice(-7)
-        .map(([date, count]) => ({ date, count })),
-      
-      // Session actuelle
-      currentSession: {
-        startTime: sessionStats.startTime || now.toLocaleTimeString('fr-FR'),
-        duration: sessionStats.duration || '0:00',
-        pageViews: sessionStats.pageViews || 0,
-        actions: sessionStats.actions || 0
-      },
-      
-      lastUpdated: now.toISOString()
-    };
-
-    setStats(compiledStats);
-    setLoading(false);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('sos_admin_auth');
-    setIsAuthenticated(false);
-  };
-
-  const exportData = () => {
-    const data = {
-      stats,
-      exportedAt: new Date().toISOString(),
-      appVersion: '3.0'
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sos-africa-stats-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const resetStats = () => {
-    if (confirm('⚠️ Êtes-vous sûr de vouloir réinitialiser toutes les statistiques ?')) {
-      localStorage.removeItem('sos_app_stats');
-      localStorage.removeItem('sos_visit_history');
-      loadStats();
-    }
-  };
-
-  // Écran de connexion
-  if (!isAuthenticated) {
-    return (
-      <div className="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/30">
-              <Lock className="w-10 h-10 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white">Admin SOS Africa</h1>
-            <p className="text-slate-400 text-sm mt-2">Tableau de bord administrateur</p>
-          </div>
-
-          <div className="space-y-4">
-            <input
-              type="password"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Code d'accès secret"
-              className="w-full px-4 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 text-center text-lg tracking-widest"
-              onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
-              autoFocus
-            />
-
-            {error && (
-              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-xl">
-                <p className="text-red-400 text-sm text-center">{error}</p>
-              </div>
-            )}
-
-            <button
-              onClick={handleAuth}
-              className="w-full py-4 bg-gradient-to-r from-red-500 to-orange-500 text-white font-bold rounded-xl hover:from-red-600 hover:to-orange-600 transition-all shadow-lg shadow-red-500/30"
-            >
-              Accéder au Dashboard
-            </button>
-
-            <button
-              onClick={onClose}
-              className="w-full py-3 text-slate-400 hover:text-white transition-colors"
-            >
-              ← Retour à l'application
-            </button>
-          </div>
-
-          <p className="text-center text-slate-600 text-xs mt-8">
-            🔒 Accès sécurisé réservé à l'administrateur
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Dashboard Admin
+// ════════════════════════════════════════════════════════════
+// STAT CARD
+// ════════════════════════════════════════════════════════════
+const StatCard = ({ icon: Icn, label, value, sub, color = 'red' }) => {
+  const c =
+    color === 'gold'
+      ? 'var(--gold)'
+      : color === 'green'
+      ? 'var(--green)'
+      : color === 'blue'
+      ? 'var(--blue)'
+      : color === 'amber'
+      ? 'var(--amber)'
+      : 'var(--red)';
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 overflow-y-auto">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700 px-4 py-4 sticky top-0 z-10">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-xl flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Dashboard Admin</h1>
-              <p className="text-xs text-slate-400">SOS Africa Analytics</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadStats}
-              disabled={loading}
-              className="p-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors"
-              title="Actualiser"
-            >
-              <RefreshCw className={`w-5 h-5 text-slate-300 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors"
-              title="Fermer"
-            >
-              <X className="w-5 h-5 text-slate-300" />
-            </button>
-          </div>
+    <div
+      className="rounded-2xl p-3.5 relative overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg, color-mix(in oklab, ${c} 14%, transparent), color-mix(in oklab, ${c} 4%, transparent))`,
+        border: `1px solid color-mix(in oklab, ${c} 35%, transparent)`,
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{
+            background: `color-mix(in oklab, ${c} 18%, transparent)`,
+            color: c,
+            border: `1px solid color-mix(in oklab, ${c} 35%, transparent)`,
+          }}
+        >
+          <Icn size={16} />
         </div>
-      </header>
-
-      {/* Tabs */}
-      <div className="bg-slate-900 border-b border-slate-700 px-4">
-        <div className="flex gap-1 max-w-4xl mx-auto overflow-x-auto">
-          {[
-            { id: 'overview', label: 'Vue d\'ensemble', icon: Eye },
-            { id: 'features', label: 'Fonctionnalités', icon: Zap },
-            { id: 'geo', label: 'Géographie', icon: Globe },
-            { id: 'donations', label: 'Donations', icon: Heart },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'border-red-500 text-red-400'
-                  : 'border-transparent text-slate-400 hover:text-white'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {sub && (
+          <div className="text-[10.5px] font-bold" style={{ color: c }}>
+            {sub}
+          </div>
+        )}
       </div>
-
-      {/* Content */}
-      <main className="p-4 max-w-4xl mx-auto pb-24">
-        {/* Vue d'ensemble */}
-        {activeTab === 'overview' && (
-          <div className="space-y-4">
-            {/* Stats principales */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard icon={Users} label="Utilisateurs" value={stats?.totalUsers || 0} color="blue" />
-              <StatCard icon={Activity} label="Actifs aujourd'hui" value={stats?.activeToday || 0} color="green" />
-              <StatCard icon={AlertTriangle} label="Alertes envoyées" value={stats?.totalAlerts || 0} color="red" />
-              <StatCard icon={Clock} label="Temps moyen" value={stats?.avgSessionTime || '0:00'} color="purple" isText />
-            </div>
-
-            {/* Graphique des 7 derniers jours */}
-            <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-400" />
-                Activité des 7 derniers jours
-              </h3>
-              <div className="flex items-end justify-between h-32 gap-2">
-                {(stats?.dailyStats || []).map((day, idx) => {
-                  const maxCount = Math.max(...(stats?.dailyStats || []).map(d => d.count), 1);
-                  const height = (day.count / maxCount) * 100;
-                  return (
-                    <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-xs text-slate-400">{day.count}</span>
-                      <div 
-                        className="w-full bg-gradient-to-t from-blue-500 to-cyan-400 rounded-t-lg transition-all"
-                        style={{ height: `${Math.max(height, 5)}%` }}
-                      />
-                      <span className="text-[10px] text-slate-500">{day.date.split('-')[2]}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Session actuelle */}
-            <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700">
-              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-green-400" />
-                Session actuelle
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <p className="text-slate-400 text-xs">Début</p>
-                  <p className="text-white font-bold">{stats?.currentSession?.startTime || 'N/A'}</p>
-                </div>
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <p className="text-slate-400 text-xs">Durée</p>
-                  <p className="text-white font-bold">{stats?.currentSession?.duration || '0:00'}</p>
-                </div>
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <p className="text-slate-400 text-xs">Pages vues</p>
-                  <p className="text-white font-bold">{stats?.currentSession?.pageViews || 0}</p>
-                </div>
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <p className="text-slate-400 text-xs">Actions</p>
-                  <p className="text-white font-bold">{stats?.currentSession?.actions || 0}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Fonctionnalités */}
-        {activeTab === 'features' && (
-          <div className="space-y-4">
-            <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-yellow-400" />
-                Utilisation des fonctionnalités
-              </h3>
-              <div className="space-y-3">
-                {[
-                  { name: 'Bouton SOS', value: stats?.features?.sosButton || 0, icon: AlertTriangle, color: 'red' },
-                  { name: 'Secouer pour alerter', value: stats?.features?.shakeAlert || 0, icon: Zap, color: 'yellow' },
-                  { name: 'Mode Furtif', value: stats?.features?.ghostMode || 0, icon: Moon, color: 'purple' },
-                  { name: 'Faux Appel', value: stats?.features?.fakeCall || 0, icon: Phone, color: 'orange' },
-                  { name: 'Enregistrement Audio', value: stats?.features?.audioRecord || 0, icon: Mic, color: 'blue' },
-                  { name: 'Mode Trajet', value: stats?.features?.journeyMode || 0, icon: Navigation, color: 'green' },
-                  { name: 'Sirène', value: stats?.features?.sirenMode || 0, icon: Bell, color: 'pink' },
-                ].map((feature, idx) => {
-                  const maxValue = Math.max(...Object.values(stats?.features || {}), 1);
-                  const percentage = (feature.value / maxValue) * 100;
-                  return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <feature.icon className={`w-5 h-5 text-${feature.color}-400`} />
-                      <div className="flex-1">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-slate-300 text-sm">{feature.name}</span>
-                          <span className="text-white font-bold">{feature.value}</span>
-                        </div>
-                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full bg-${feature.color}-500 rounded-full transition-all`}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Alertes */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-center">
-                <p className="text-3xl font-bold text-red-400">{stats?.totalAlerts || 0}</p>
-                <p className="text-slate-400 text-xs">Total alertes</p>
-              </div>
-              <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 text-center">
-                <p className="text-3xl font-bold text-green-400">{stats?.alertsToday || 0}</p>
-                <p className="text-slate-400 text-xs">Aujourd'hui</p>
-              </div>
-              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4 text-center">
-                <p className="text-3xl font-bold text-yellow-400">{stats?.cancelledAlerts || 0}</p>
-                <p className="text-slate-400 text-xs">Annulées</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Géographie */}
-        {activeTab === 'geo' && (
-          <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Globe className="w-5 h-5 text-cyan-400" />
-              Répartition par pays
-            </h3>
-            <div className="space-y-3">
-              {Object.entries(stats?.countries || {})
-                .sort((a, b) => b[1] - a[1])
-                .map(([country, count], idx) => {
-                  const total = Object.values(stats?.countries || {}).reduce((a, b) => a + b, 1);
-                  const percentage = (count / total) * 100;
-                  const flags = {
-                    'Cameroun': '🇨🇲',
-                    'France': '🇫🇷',
-                    'Côte d\'Ivoire': '🇨🇮',
-                    'Sénégal': '🇸🇳',
-                    'Belgique': '🇧🇪',
-                    'Gabon': '🇬🇦',
-                    'Congo': '🇨🇬',
-                  };
-                  return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <span className="text-2xl">{flags[country] || '🌍'}</span>
-                      <div className="flex-1">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-slate-300">{country}</span>
-                          <span className="text-white font-bold">{count} ({percentage.toFixed(1)}%)</span>
-                        </div>
-                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        )}
-
-        {/* Donations */}
-        {activeTab === 'donations' && (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-pink-500/20 to-red-500/20 rounded-2xl p-6 border border-pink-500/30">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Heart className="w-5 h-5 text-pink-400" />
-                Donations reçues
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-900/50 rounded-xl p-4 text-center">
-                  <p className="text-4xl font-bold text-pink-400">
-                    {(stats?.donations?.total || 0).toLocaleString()}
-                  </p>
-                  <p className="text-slate-400 text-sm">FCFA Total</p>
-                </div>
-                <div className="bg-slate-900/50 rounded-xl p-4 text-center">
-                  <p className="text-4xl font-bold text-white">
-                    {stats?.donations?.count || 0}
-                  </p>
-                  <p className="text-slate-400 text-sm">Donateurs</p>
-                </div>
-              </div>
-              {stats?.donations?.lastDonation && (
-                <p className="text-center text-slate-400 text-sm mt-4">
-                  Dernier don: {new Date(stats.donations.lastDonation).toLocaleDateString('fr-FR')}
-                </p>
-              )}
-            </div>
-
-            <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700">
-              <h4 className="font-bold text-white mb-3">Liens de paiement</h4>
-              <div className="space-y-2 text-sm">
-                <p className="text-slate-300">💳 Stripe: <span className="text-blue-400">buy.stripe.com/...</span></p>
-                <p className="text-slate-300">📱 MTN: <span className="text-yellow-400">+237 651 495 483</span></p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="space-y-3 mt-6">
-          <button
-            onClick={exportData}
-            className="w-full p-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 transition-colors flex items-center justify-center gap-2"
-          >
-            <Download className="w-5 h-5" />
-            Exporter les données (JSON)
-          </button>
-
-          <button
-            onClick={resetStats}
-            className="w-full p-4 bg-slate-700 text-slate-300 font-bold rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
-          >
-            <RefreshCw className="w-5 h-5" />
-            Réinitialiser les statistiques
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="w-full p-4 text-red-400 hover:text-red-300 transition-colors"
-          >
-            Se déconnecter
-          </button>
-        </div>
-
-        {/* Footer */}
-        <p className="text-center text-slate-600 text-xs mt-6">
-          Dernière mise à jour: {stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleString('fr-FR') : 'N/A'}
-        </p>
-      </main>
+      <div className="text-[10.5px] uppercase tracking-wider font-bold text-white/55">
+        {label}
+      </div>
+      <div className="text-[20px] font-extrabold text-white font-display leading-tight">
+        {value}
+      </div>
     </div>
   );
 };
 
-// Composant StatCard
-const StatCard = ({ icon: Icon, label, value, color, isText = false }) => {
-  const colorClasses = {
-    blue: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    green: 'bg-green-500/20 text-green-400 border-green-500/30',
-    purple: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    red: 'bg-red-500/20 text-red-400 border-red-500/30'
+// ════════════════════════════════════════════════════════════
+// PAYMENT CARD
+// ════════════════════════════════════════════════════════════
+const PaymentCard = ({ payment, onApprove, onReject }) => {
+  const [busy, setBusy] = useState(null);
+  const [showImage, setShowImage] = useState(false);
+  const ts = tsToMs(payment.createdAt);
+  const planLabel = PLAN_LABEL[payment.plan] || payment.plan;
+  const amount = payment.amount || PLAN_XAF[payment.plan] || 0;
+
+  const handle = async (action) => {
+    setBusy(action);
+    try {
+      if (action === 'approve') await onApprove(payment);
+      else if (action === 'reject') await onReject(payment);
+    } finally {
+      setBusy(null);
+    }
   };
 
+  const statusColor =
+    payment.status === 'approved'
+      ? 'var(--green)'
+      : payment.status === 'rejected'
+      ? 'var(--red)'
+      : 'var(--amber)';
+  const statusLabel =
+    payment.status === 'approved'
+      ? 'Validé'
+      : payment.status === 'rejected'
+      ? 'Refusé'
+      : 'À valider';
+
   return (
-    <div className={`rounded-2xl p-4 border ${colorClasses[color]}`}>
-      <Icon className="w-6 h-6 mb-2" />
-      <p className="text-2xl font-bold text-white">{isText ? value : value.toLocaleString()}</p>
-      <p className="text-slate-400 text-xs">{label}</p>
+    <div className="glass rounded-2xl p-3.5" style={{ borderColor: 'var(--stroke)' }}>
+      <div className="flex items-start gap-3">
+        {/* Screenshot thumb */}
+        <button
+          onClick={() => payment.screenshotUrl && setShowImage(true)}
+          className="tap shrink-0 w-16 h-16 rounded-xl overflow-hidden glass flex items-center justify-center"
+          style={{
+            borderColor: 'var(--stroke)',
+            background: payment.screenshotUrl
+              ? `url('${payment.screenshotUrl}') center/cover`
+              : 'rgba(255,255,255,.04)',
+          }}
+        >
+          {!payment.screenshotUrl && <span className="text-2xl">📸</span>}
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <div className="text-[13.5px] font-bold text-white truncate">
+              {payment.userId || 'Anonyme'}
+            </div>
+            <span
+              className="text-[9.5px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
+              style={{
+                color: statusColor,
+                background: `color-mix(in oklab, ${statusColor} 14%, transparent)`,
+                border: `1px solid color-mix(in oklab, ${statusColor} 35%, transparent)`,
+              }}
+            >
+              {statusLabel}
+            </span>
+          </div>
+          <div className="text-[11px] text-white/65 leading-snug">
+            <span className="font-bold text-white">{planLabel}</span> ·{' '}
+            <span className="font-mono">{amount.toLocaleString('fr-FR')} XAF</span>
+          </div>
+          <div className="text-[10.5px] text-white/45 leading-tight">
+            📞 {payment.phone || '—'} · {fmtRelative(ts)}
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      {(!payment.status || payment.status === 'pending_review') && (
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={() => handle('reject')}
+            disabled={!!busy}
+            className="tap glass flex-1 py-2.5 rounded-xl text-[12px] font-bold text-white/85 disabled:opacity-50"
+            style={{ borderColor: 'var(--stroke)' }}
+          >
+            {busy === 'reject' ? '…' : 'Refuser'}
+          </button>
+          <button
+            onClick={() => handle('approve')}
+            disabled={!!busy}
+            className="tap btn-primary-green flex-1 py-2.5 rounded-xl text-[12px] font-extrabold flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            {busy === 'approve' ? 'Activation…' : (
+              <>
+                <ICheck size={13} stroke={3} /> Approuver et activer
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Image lightbox */}
+      {showImage && payment.screenshotUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,.92)' }}
+          onClick={() => setShowImage(false)}
+        >
+          <img
+            src={payment.screenshotUrl}
+            alt="Capture paiement"
+            className="max-w-full max-h-full rounded-xl"
+          />
+          <button
+            onClick={() => setShowImage(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full glass flex items-center justify-center text-white"
+            style={{ borderColor: 'var(--stroke)' }}
+          >
+            <IX size={18} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════
+// USER CARD
+// ════════════════════════════════════════════════════════════
+const UserCard = ({ user, onExtend, onRevoke }) => {
+  const [busy, setBusy] = useState(null);
+  const premium = user.premium || {};
+  const until = tsToMs(premium.until);
+  const days = daysLeft(until);
+  const expSoon = days > 0 && days < 7;
+
+  const handle = async (action, days) => {
+    setBusy(action);
+    try {
+      if (action === 'extend') await onExtend(user, days);
+      else if (action === 'revoke') await onRevoke(user);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const c = !premium.active
+    ? 'var(--text-mute)'
+    : days === 0
+    ? 'var(--red)'
+    : expSoon
+    ? 'var(--amber)'
+    : 'var(--green)';
+
+  return (
+    <div className="glass rounded-2xl p-3" style={{ borderColor: 'var(--stroke)' }}>
+      <div className="flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-[14px]"
+          style={{
+            background: 'linear-gradient(135deg, #FFD86A, #2a2a2a)',
+            border: '1px solid rgba(255,255,255,.1)',
+          }}
+        >
+          {(user.id || '?').slice(0, 1).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13.5px] font-bold text-white truncate flex items-center gap-1.5">
+            {user.id || 'Sans nom'}
+            {premium.active && days > 0 && (
+              <ICrown size={11} className="text-[color:var(--gold)] shrink-0" />
+            )}
+          </div>
+          <div className="text-[11px] text-white/65">
+            {premium.active ? PLAN_LABEL[premium.plan] || premium.plan : 'Free'}
+            {' · '}
+            <span style={{ color: c }} className="font-bold">
+              {!premium.active
+                ? 'inactif'
+                : days === 0
+                ? 'expiré'
+                : `${days} j restants`}
+            </span>
+          </div>
+          <div className="text-[10px] text-white/45">
+            Jusqu'au {fmtDate(until)}
+          </div>
+        </div>
+        {premium.active && (
+          <div className="flex gap-1 shrink-0">
+            <button
+              onClick={() => handle('extend', 30)}
+              disabled={!!busy}
+              className="tap text-[10px] font-extrabold px-2 py-1 rounded-lg disabled:opacity-50"
+              style={{
+                color: 'var(--gold)',
+                background: 'rgba(244,194,75,.12)',
+                border: '1px solid rgba(244,194,75,.35)',
+              }}
+            >
+              {busy === 'extend' ? '…' : '+30j'}
+            </button>
+            <button
+              onClick={() => handle('revoke')}
+              disabled={!!busy}
+              className="tap text-[10px] font-extrabold px-2 py-1 rounded-lg disabled:opacity-50"
+              style={{
+                color: 'var(--red-soft)',
+                background: 'rgba(255,46,63,.10)',
+                border: '1px solid rgba(255,46,63,.30)',
+              }}
+            >
+              {busy === 'revoke' ? '…' : '✕'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════
+// CODE CARD
+// ════════════════════════════════════════════════════════════
+const CodeCard = ({ code, onCopy, onDelete }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+  return (
+    <div className="glass rounded-xl p-3 flex items-center gap-2.5" style={{ borderColor: 'var(--stroke)' }}>
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+        style={{
+          background: code.used ? 'rgba(255,255,255,.05)' : 'rgba(244,194,75,.14)',
+          color: code.used ? 'var(--text-mute)' : 'var(--gold)',
+          border: `1px solid ${code.used ? 'var(--stroke)' : 'rgba(244,194,75,.4)'}`,
+        }}
+      >
+        <ICrown size={14} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-mono text-[13px] font-extrabold text-white tracking-wider truncate">
+          {code.id}
+        </div>
+        <div className="text-[10.5px] text-white/55">
+          {PLAN_LABEL[code.plan] || code.plan} · {code.durationDays || 30}j
+          {code.used ? (
+            <span className="ml-1 text-[color:var(--text-mute)]">
+              · utilisé par {code.usedBy || '?'}
+            </span>
+          ) : (
+            <span className="ml-1 text-[color:var(--green)]">· disponible</span>
+          )}
+        </div>
+      </div>
+      {!code.used && (
+        <button
+          onClick={handleCopy}
+          className="tap glass rounded-lg px-2 py-1 text-[10.5px] font-bold text-white/85"
+          style={{ borderColor: 'var(--stroke)' }}
+        >
+          {copied ? '✓' : <ICopy size={11} />}
+        </button>
+      )}
+      {code.used && (
+        <button
+          onClick={() => onDelete && onDelete(code)}
+          className="tap text-white/40 hover:text-white/70 px-1"
+        >
+          <ITrash size={12} />
+        </button>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════
+// MAIN ADMIN DASHBOARD
+// ════════════════════════════════════════════════════════════
+const AdminDashboard = ({ onClose }) => {
+  const [activeTab, setActiveTab] = useState('payments');
+  const [payments, setPayments] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [codes, setCodes] = useState([]);
+  const [search, setSearch] = useState('');
+  const [toast, setToast] = useState(null);
+  const [genPlan, setGenPlan] = useState('monthly');
+  const [showGenerator, setShowGenerator] = useState(false);
+
+  // Load payments
+  useEffect(() => {
+    const q = query(collection(db, 'payments'), orderBy('createdAt', 'desc'));
+    return onSnapshot(
+      q,
+      (snap) => {
+        setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (err) => console.error('payments listener:', err)
+    );
+  }, []);
+
+  // Load users
+  useEffect(() => {
+    return onSnapshot(
+      collection(db, 'users'),
+      (snap) => {
+        setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (err) => console.error('users listener:', err)
+    );
+  }, []);
+
+  // Load codes
+  useEffect(() => {
+    return onSnapshot(
+      collection(db, 'premiumCodes'),
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (a.used ? 1 : 0) - (b.used ? 1 : 0));
+        setCodes(list);
+      },
+      (err) => console.error('codes listener:', err)
+    );
+  }, []);
+
+  // ───── Stats ─────
+  const stats = useMemo(() => {
+    const pendingPayments = payments.filter(
+      (p) => !p.status || p.status === 'pending_review'
+    );
+    const approvedPayments = payments.filter((p) => p.status === 'approved');
+    const totalRevenue = approvedPayments.reduce(
+      (sum, p) => sum + (p.amount || PLAN_XAF[p.plan] || 0),
+      0
+    );
+    const activePremium = users.filter(
+      (u) =>
+        u.premium?.active &&
+        (!u.premium?.until || tsToMs(u.premium.until) > Date.now())
+    );
+    const expiringSoon = activePremium.filter((u) => {
+      const d = daysLeft(tsToMs(u.premium?.until));
+      return d > 0 && d < 7;
+    });
+    const unusedCodes = codes.filter((c) => !c.used).length;
+    return {
+      pendingCount: pendingPayments.length,
+      revenueXAF: totalRevenue,
+      activeCount: activePremium.length,
+      expiringCount: expiringSoon.length,
+      unusedCodes,
+    };
+  }, [payments, users, codes]);
+
+  // ───── Actions ─────
+  const flashToast = (text, color = 'green') => {
+    setToast({ text, color });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  // Approve payment + activate user (one-click)
+  const approvePayment = async (payment) => {
+    const userId = payment.userId || `client_${Date.now()}`;
+    const plan = payment.plan || 'monthly';
+    const days = PLAN_DAYS[plan] || 30;
+    const until = Date.now() + days * 24 * 60 * 60 * 1000;
+    try {
+      await setDoc(
+        doc(db, 'users', userId),
+        {
+          premium: {
+            active: true,
+            plan,
+            until,
+            activatedAt: serverTimestamp(),
+            activatedBy: 'admin_direct',
+            paymentId: payment.id,
+          },
+        },
+        { merge: true }
+      );
+      await updateDoc(doc(db, 'payments', payment.id), {
+        status: 'approved',
+        approvedAt: serverTimestamp(),
+      });
+      flashToast(`${userId} activé · ${days} jours`, 'green');
+    } catch (err) {
+      console.error(err);
+      flashToast('Erreur : ' + (err.message || 'inconnue'), 'red');
+    }
+  };
+
+  const rejectPayment = async (payment) => {
+    try {
+      await updateDoc(doc(db, 'payments', payment.id), {
+        status: 'rejected',
+        rejectedAt: serverTimestamp(),
+      });
+      flashToast('Paiement refusé', 'amber');
+    } catch (err) {
+      flashToast('Erreur : ' + err.message, 'red');
+    }
+  };
+
+  const extendUser = async (user, days) => {
+    const currentUntil = tsToMs(user.premium?.until) || Date.now();
+    const newUntil = Math.max(currentUntil, Date.now()) + days * 24 * 60 * 60 * 1000;
+    try {
+      await setDoc(
+        doc(db, 'users', user.id),
+        {
+          premium: {
+            active: true,
+            plan: user.premium?.plan || 'monthly',
+            until: newUntil,
+          },
+        },
+        { merge: true }
+      );
+      flashToast(`+${days}j ajoutés à ${user.id}`, 'green');
+    } catch (err) {
+      flashToast('Erreur : ' + err.message, 'red');
+    }
+  };
+
+  const revokeUser = async (user) => {
+    try {
+      await setDoc(
+        doc(db, 'users', user.id),
+        {
+          premium: {
+            active: false,
+            plan: 'free',
+            until: null,
+            revokedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+      flashToast(`Premium révoqué pour ${user.id}`, 'amber');
+    } catch (err) {
+      flashToast('Erreur : ' + err.message, 'red');
+    }
+  };
+
+  const generateCode = async () => {
+    const code = 'SOS-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const days = PLAN_DAYS[genPlan] || 30;
+    try {
+      await setDoc(doc(db, 'premiumCodes', code), {
+        used: false,
+        plan: genPlan,
+        durationDays: days,
+        createdAt: serverTimestamp(),
+        createdBy: 'admin',
+      });
+      flashToast(`Code créé : ${code}`, 'green');
+      setShowGenerator(false);
+      try {
+        await navigator.clipboard.writeText(code);
+      } catch {}
+    } catch (err) {
+      flashToast('Erreur : ' + err.message, 'red');
+    }
+  };
+
+  const deleteCode = async (code) => {
+    if (!window.confirm(`Supprimer le code ${code.id} ?`)) return;
+    try {
+      await deleteDoc(doc(db, 'premiumCodes', code.id));
+      flashToast('Code supprimé', 'amber');
+    } catch (err) {
+      flashToast('Erreur : ' + err.message, 'red');
+    }
+  };
+
+  // ───── Filtered lists ─────
+  const filteredPayments = payments.filter((p) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      (p.userId || '').toLowerCase().includes(s) ||
+      (p.phone || '').toLowerCase().includes(s) ||
+      (p.plan || '').toLowerCase().includes(s)
+    );
+  });
+
+  const filteredUsers = users.filter((u) => {
+    if (!search) return true;
+    return (u.id || '').toLowerCase().includes(search.toLowerCase());
+  });
+
+  return (
+    <div
+      className="min-h-screen flex flex-col"
+      style={{
+        background:
+          'radial-gradient(140% 90% at 50% -20%, rgba(244,194,75,.12), transparent 55%), linear-gradient(180deg, #06080F 0%, #04060B 60%, #03050A 100%)',
+        color: 'var(--text)',
+      }}
+    >
+      {/* Header */}
+      <header className="px-5 pt-4 pb-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(180deg,#FFD86A,#D9971C)',
+              boxShadow: '0 0 18px rgba(244,194,75,.5)',
+            }}
+          >
+            <IShield size={19} className="text-[#241500]" />
+          </div>
+          <div>
+            <div
+              className="font-extrabold text-[16px] font-display"
+              style={{ letterSpacing: '-.01em' }}
+            >
+              <span className="text-grad-gold">Super</span>
+              <span className="text-white"> Admin</span>
+            </div>
+            <div className="text-[10.5px] text-white/55">
+              SOS Africa · Console
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
+          style={{ borderColor: 'var(--stroke)' }}
+        >
+          <IX size={18} />
+        </button>
+      </header>
+
+      {/* Stats grid */}
+      <div className="px-5 grid grid-cols-2 gap-2.5">
+        <StatCard
+          icon={IBell}
+          label="À valider"
+          value={stats.pendingCount}
+          color="amber"
+          sub={stats.pendingCount > 0 ? 'Action requise' : null}
+        />
+        <StatCard
+          icon={ICrown}
+          label="Premium actifs"
+          value={stats.activeCount}
+          color="gold"
+          sub={`${stats.expiringCount} expirent <7j`}
+        />
+        <StatCard
+          icon={IRefresh}
+          label="CA validé"
+          value={`${stats.revenueXAF.toLocaleString('fr-FR')} XAF`}
+          color="green"
+        />
+        <StatCard
+          icon={ICheck}
+          label="Codes dispo"
+          value={stats.unusedCodes}
+          color="blue"
+        />
+      </div>
+
+      {/* Tabs */}
+      <div className="px-5 mt-4">
+        <div
+          className="glass rounded-xl flex p-1"
+          style={{ borderColor: 'var(--stroke)' }}
+        >
+          {[
+            { id: 'payments', label: 'Paiements', count: stats.pendingCount },
+            { id: 'users', label: 'Utilisateurs', count: stats.activeCount },
+            { id: 'codes', label: 'Codes', count: stats.unusedCodes },
+          ].map((t) => {
+            const isActive = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className="tap flex-1 py-2 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5"
+                style={{
+                  background: isActive ? 'rgba(244,194,75,.16)' : 'transparent',
+                  color: isActive ? 'var(--gold)' : 'rgba(255,255,255,.6)',
+                  border: `1px solid ${isActive ? 'rgba(244,194,75,.4)' : 'transparent'}`,
+                }}
+              >
+                {t.label}
+                {t.count > 0 && (
+                  <span
+                    className="text-[9.5px] font-extrabold px-1.5 py-0.5 rounded"
+                    style={{
+                      background: isActive
+                        ? 'rgba(244,194,75,.25)'
+                        : 'rgba(255,255,255,.08)',
+                      color: isActive ? 'var(--gold)' : 'rgba(255,255,255,.7)',
+                    }}
+                  >
+                    {t.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Search */}
+      {(activeTab === 'payments' || activeTab === 'users') && (
+        <div className="px-5 mt-3">
+          <div
+            className="glass rounded-xl flex items-center gap-2 px-3.5 py-2"
+            style={{ borderColor: 'var(--stroke)' }}
+          >
+            <ISearch size={14} className="text-white/45" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={
+                activeTab === 'payments'
+                  ? 'Rechercher par nom, téléphone, plan…'
+                  : 'Rechercher un utilisateur…'
+              }
+              className="bg-transparent outline-none text-[13px] text-white placeholder-white/40 w-full"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="tap text-white/45">
+                <IX size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      <main
+        className="flex-1 min-h-0 overflow-y-auto px-5 mt-3 pb-8 space-y-2"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        {activeTab === 'payments' && (
+          <>
+            {filteredPayments.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-4xl mb-2">📭</div>
+                <div className="text-[13px] text-white/55">
+                  {search
+                    ? 'Aucun paiement ne correspond.'
+                    : 'Aucun paiement reçu pour l\'instant.'}
+                </div>
+              </div>
+            ) : (
+              filteredPayments.map((p) => (
+                <PaymentCard
+                  key={p.id}
+                  payment={p}
+                  onApprove={approvePayment}
+                  onReject={rejectPayment}
+                />
+              ))
+            )}
+          </>
+        )}
+
+        {activeTab === 'users' && (
+          <>
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-4xl mb-2">👤</div>
+                <div className="text-[13px] text-white/55">
+                  {search ? 'Aucun utilisateur trouvé.' : 'Pas encore d\'utilisateurs.'}
+                </div>
+              </div>
+            ) : (
+              filteredUsers.map((u) => (
+                <UserCard
+                  key={u.id}
+                  user={u}
+                  onExtend={extendUser}
+                  onRevoke={revokeUser}
+                />
+              ))
+            )}
+          </>
+        )}
+
+        {activeTab === 'codes' && (
+          <>
+            <button
+              onClick={() => setShowGenerator(true)}
+              className="tap btn-primary-gold w-full py-3 rounded-xl text-[13px] font-extrabold flex items-center justify-center gap-2 font-display mb-2"
+            >
+              <IPlus size={15} /> Générer un nouveau code
+            </button>
+            {codes.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-3xl mb-2">🎟️</div>
+                <div className="text-[12.5px] text-white/55">
+                  Aucun code généré. Crée-en un pour activer un client.
+                </div>
+              </div>
+            ) : (
+              codes.map((c) => (
+                <CodeCard key={c.id} code={c} onDelete={deleteCode} />
+              ))
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Generator modal */}
+      {showGenerator && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center">
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setShowGenerator(false)}
+          />
+          <div
+            className="relative w-full max-w-md glass-strong rounded-t-3xl p-5 mb-0"
+            style={{ borderBottom: 0 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-[16px] font-extrabold text-grad-gold font-display flex items-center gap-2">
+                <ICrown size={17} /> Générer un code
+              </div>
+              <button
+                onClick={() => setShowGenerator(false)}
+                className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
+                style={{ borderColor: 'var(--stroke)' }}
+              >
+                <IX size={16} />
+              </button>
+            </div>
+            <p className="text-[12px] text-white/65 mb-3 leading-snug">
+              Un code unique sera généré et copié. Donne-le au client après vérification du paiement.
+            </p>
+            <div className="text-[10.5px] uppercase tracking-wider font-bold text-white/55 mb-2">
+              Plan
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {['monthly', 'yearly', 'family'].map((p) => {
+                const isActive = genPlan === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setGenPlan(p)}
+                    className="tap glass rounded-xl p-2.5 text-center halo-gold"
+                    style={{
+                      borderColor: isActive ? 'rgba(244,194,75,.5)' : 'var(--stroke)',
+                      background: isActive ? 'rgba(244,194,75,.10)' : undefined,
+                    }}
+                  >
+                    <div
+                      className="text-[12px] font-bold"
+                      style={{
+                        color: isActive ? 'var(--gold)' : 'rgba(255,255,255,.85)',
+                      }}
+                    >
+                      {PLAN_LABEL[p]}
+                    </div>
+                    <div className="text-[10px] text-white/55">
+                      {PLAN_DAYS[p]}j · {PLAN_XAF[p].toLocaleString('fr-FR')} XAF
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={generateCode}
+              className="tap btn-primary-gold w-full py-3 rounded-xl text-[14px] font-extrabold flex items-center justify-center gap-2 font-display"
+            >
+              <IPlus size={15} /> Créer et copier le code
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 px-4 py-3 rounded-2xl glass-strong text-[13px] font-bold text-white flex items-center gap-2"
+          style={{
+            borderColor:
+              toast.color === 'red'
+                ? 'rgba(255,46,63,.5)'
+                : toast.color === 'amber'
+                ? 'rgba(255,176,32,.5)'
+                : 'rgba(34,214,123,.5)',
+            boxShadow: '0 12px 40px rgba(0,0,0,.4)',
+          }}
+        >
+          {toast.color === 'green' && <ICheck size={14} className="text-[color:var(--green)]" />}
+          {toast.color === 'red' && <IAlert size={14} className="text-[color:var(--red-soft)]" />}
+          {toast.color === 'amber' && <IInfo size={14} className="text-[color:var(--amber)]" />}
+          {toast.text}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════
+// PIN GATE
+// ════════════════════════════════════════════════════════════
+const AdminPage = ({ onClose }) => {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
+  const [authed, setAuthed] = useState(
+    () => sessionStorage.getItem('sos_admin_authed') === '1'
+  );
+
+  const submit = (e) => {
+    e?.preventDefault?.();
+    if (pin === ADMIN_PIN) {
+      setAuthed(true);
+      sessionStorage.setItem('sos_admin_authed', '1');
+    } else {
+      setError(true);
+      setPin('');
+      setTimeout(() => setError(false), 1200);
+    }
+  };
+
+  if (authed) return <AdminDashboard onClose={onClose} />;
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-5"
+      style={{
+        background:
+          'radial-gradient(140% 90% at 50% -20%, rgba(244,194,75,.18), transparent 55%), linear-gradient(180deg, #06080F 0%, #04060B 60%, #03050A 100%)',
+        color: 'var(--text)',
+      }}
+    >
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div
+            className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-3"
+            style={{
+              background: 'linear-gradient(180deg,#FFD86A,#D9971C)',
+              boxShadow: '0 0 36px rgba(244,194,75,.55)',
+            }}
+          >
+            <IShield size={28} className="text-[#241500]" />
+          </div>
+          <div className="text-[20px] font-extrabold font-display">
+            <span className="text-grad-gold">Super</span>{' '}
+            <span className="text-white">Admin</span>
+          </div>
+          <div className="text-[12px] text-white/55 mt-1">
+            Accès réservé · PIN requis
+          </div>
+        </div>
+
+        <form
+          onSubmit={submit}
+          className="glass-strong rounded-2xl p-5 space-y-3"
+          style={{ borderColor: 'var(--stroke)' }}
+        >
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="PIN"
+            autoFocus
+            className="w-full px-3 py-3 rounded-xl glass text-center text-[20px] font-mono font-bold text-white tracking-[0.5em] placeholder-white/25"
+            style={{
+              borderColor: error ? 'rgba(255,46,63,.5)' : 'var(--stroke)',
+              animation: error ? 'shake 0.3s' : 'none',
+            }}
+          />
+          {error && (
+            <div className="text-[11.5px] text-[color:var(--red-soft)] text-center">
+              PIN incorrect
+            </div>
+          )}
+          <button
+            type="submit"
+            className="tap btn-primary-gold w-full py-3 rounded-xl text-[13.5px] font-extrabold font-display"
+          >
+            Entrer
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="tap w-full py-2 text-[11.5px] text-white/55 hover:text-white"
+          >
+            Retour à l'app
+          </button>
+        </form>
+      </div>
     </div>
   );
 };
