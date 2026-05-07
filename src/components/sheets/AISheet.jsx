@@ -11,7 +11,11 @@ import {
   IVideo,
   IFamily,
   IAlert,
+  ICrown,
 } from '../ui/icons';
+import { incrementDailyCounter, getDailyCounter } from '../../hooks/usePremiumStatus';
+
+const FREE_DAILY_LIMIT = 5;
 
 const SUGGESTIONS = [
   '🚖 On essaie de monter dans mon taxi',
@@ -93,13 +97,16 @@ const Bubble = ({ role, content, actions, onAction }) => {
   );
 };
 
-const AISheet = ({ location, language = 'fr', onAction }) => {
+const AISheet = ({ location, language = 'fr', onAction, isPremium = false, onUpgrade }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [todayCount, setTodayCount] = useState(() => getDailyCounter('ai'));
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+
+  const remainingFree = isPremium ? Infinity : Math.max(0, FREE_DAILY_LIMIT - todayCount);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -111,6 +118,18 @@ const AISheet = ({ location, language = 'fr', onAction }) => {
   const send = async (textOverride) => {
     const text = (textOverride ?? input).trim();
     if (!text || loading) return;
+
+    // Free tier daily limit
+    if (!isPremium) {
+      const result = incrementDailyCounter('ai', FREE_DAILY_LIMIT);
+      if (!result.allowed) {
+        setError(
+          `Limite gratuite atteinte (${FREE_DAILY_LIMIT}/jour). Passe à Premium pour des questions illimitées.`
+        );
+        return;
+      }
+      setTodayCount(result.count);
+    }
 
     const userMsg = { role: 'user', content: text };
     const nextMessages = [...messages, userMsg];
@@ -196,11 +215,24 @@ const AISheet = ({ location, language = 'fr', onAction }) => {
           <IBrain size={17} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-bold text-white font-display">
+          <div className="text-[13px] font-bold text-white font-display flex items-center gap-1.5">
             Assistant Sécurité
+            {isPremium && (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[8.5px] font-extrabold uppercase tracking-wider"
+                style={{
+                  background: 'linear-gradient(180deg,#FFD86A,#D9971C)',
+                  color: '#241500',
+                }}
+              >
+                <ICrown size={9} />
+              </span>
+            )}
           </div>
           <div className="text-[10.5px] text-white/55">
-            Disponible 24h/24 · Conseils, premiers secours, anti-stress
+            {isPremium
+              ? 'Premium · questions illimitées'
+              : `${remainingFree}/${FREE_DAILY_LIMIT} questions gratuites aujourd'hui`}
           </div>
         </div>
         {messages.length > 0 && (
@@ -212,6 +244,27 @@ const AISheet = ({ location, language = 'fr', onAction }) => {
           </button>
         )}
       </div>
+
+      {!isPremium && remainingFree === 0 && (
+        <div
+          className="rounded-xl p-3 mb-2 flex items-center gap-2"
+          style={{
+            background: 'linear-gradient(135deg, rgba(244,194,75,.16), rgba(244,194,75,.04))',
+            border: '1px solid rgba(244,194,75,.4)',
+          }}
+        >
+          <ICrown size={16} className="text-[color:var(--gold)] shrink-0" />
+          <div className="flex-1 text-[11.5px] text-white/85 leading-snug">
+            Tu as utilisé tes 5 questions gratuites du jour. Premium = illimité.
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="tap btn-primary-gold px-3 py-1.5 rounded-lg text-[11px] font-extrabold shrink-0"
+          >
+            Passer
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div

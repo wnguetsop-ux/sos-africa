@@ -4,10 +4,12 @@ import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messagi
 import { db } from '../firebase/config';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-// VAPID public key — à récupérer depuis Firebase Console
-// (Project settings → Cloud Messaging → Web configuration → Generate key pair)
-// Set via env var VITE_FIREBASE_VAPID_KEY ou en dur ici (clef publique, ok à exposer).
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
+// VAPID public key — Firebase Cloud Messaging Web Push.
+// Public key, OK to expose in client (private key reste sur Firebase).
+// Override possible via env var VITE_FIREBASE_VAPID_KEY.
+const VAPID_KEY =
+  import.meta.env.VITE_FIREBASE_VAPID_KEY ||
+  'BBT3ul0ZC3r2AX_L-jE_hMcaRECLMneJwUcFL89u7mJpbEaI2ySVXIG2wck6VAwq--fwQAjyWXhp1RNRyZaXQrk';
 
 /**
  * Hook pour gérer les push notifications FCM.

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ActivationCodeSheet from './sheets/ActivationCodeSheet';
 import {
   IShield,
   IBell,
@@ -200,6 +201,8 @@ const ProfileTab = ({
   isDark,
   userProfile,
   alertHistory,
+  premiumStatus,
+  pushNotifs,
   onDonate,
   onUpgrade,
   onShareApp,
@@ -212,9 +215,11 @@ const ProfileTab = ({
   const [billing, setBilling] = useState('monthly');
   const [showChildTracker, setShowChildTracker] = useState(false);
   const [showCodeWord, setShowCodeWord] = useState(false);
+  const [showActivation, setShowActivation] = useState(false);
   const [codeWord, setCodeWord] = useState(
     () => localStorage.getItem('sos_code_word') || ''
   );
+  const isPremium = premiumStatus?.isPremium || false;
   const innovations = innovationsState || {
     autoRecord: true,
     batteryLowAlert: true,
@@ -296,11 +301,27 @@ const ProfileTab = ({
               {userName.slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-bold text-white leading-tight truncate">
+              <div className="text-[14px] font-bold text-white leading-tight truncate flex items-center gap-1.5">
                 {userName}
+                {isPremium && (
+                  <span
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8.5px] font-extrabold uppercase tracking-wider"
+                    style={{
+                      background: 'linear-gradient(180deg,#FFD86A,#D9971C)',
+                      color: '#241500',
+                      boxShadow: '0 0 10px rgba(244,194,75,.5)',
+                    }}
+                  >
+                    <ICrown size={9} /> Premium
+                  </span>
+                )}
               </div>
               <div className="text-[11.5px] text-white/55">
-                {t ? t('profile.greeting') || 'Membre · Édition gratuite' : 'Membre · Édition gratuite'}
+                {isPremium && premiumStatus?.until
+                  ? `Premium · jusqu'au ${new Date(
+                      premiumStatus.until
+                    ).toLocaleDateString('fr-FR')}`
+                  : 'Membre · Édition gratuite'}
               </div>
             </div>
           </div>
@@ -428,16 +449,54 @@ const ProfileTab = ({
             <div className="text-[11.5px] text-white/55 mb-3">
               {t ? t('profile.cancelAnytime') || 'Annulation possible à tout moment.' : 'Annulation possible à tout moment.'}
             </div>
-            <button
-              onClick={onUpgrade || onDonate}
-              className="tap btn-primary-gold w-full py-3.5 rounded-xl text-[14px] font-extrabold flex items-center justify-center gap-2 font-display"
-            >
-              {t ? t('profile.upgradeCTA') || 'Passer à Premium' : 'Passer à Premium'}{' '}
-              <ICrown size={16} />
-            </button>
-            <div className="text-[10.5px] text-white/45 text-center mt-2">
-              {t ? t('profile.trial') || 'Essai gratuit 7 jours · Sans engagement' : 'Essai gratuit 7 jours · Sans engagement'}
-            </div>
+            {isPremium ? (
+              <div
+                className="rounded-xl p-3 flex items-center gap-2"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(34,214,123,.16), rgba(34,214,123,.04))',
+                  border: '1px solid rgba(34,214,123,.4)',
+                }}
+              >
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                  style={{
+                    background: 'linear-gradient(180deg,#5BF6A8,#14B873)',
+                    boxShadow: '0 0 18px rgba(34,214,123,.5)',
+                  }}
+                >
+                  <ICheck size={16} stroke={3} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-bold text-white">
+                    Premium actif
+                  </div>
+                  <div className="text-[11px] text-white/60">
+                    Plan {premiumStatus?.plan === 'family' ? 'Famille' : premiumStatus?.plan === 'yearly' ? 'Annuel' : 'Mensuel'} jusqu'au{' '}
+                    {premiumStatus?.until ? new Date(premiumStatus.until).toLocaleDateString('fr-FR') : ''}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={onUpgrade || onDonate}
+                  className="tap btn-primary-gold w-full py-3.5 rounded-xl text-[14px] font-extrabold flex items-center justify-center gap-2 font-display"
+                >
+                  {t ? t('profile.upgradeCTA') || 'Passer à Premium' : 'Passer à Premium'}{' '}
+                  <ICrown size={16} />
+                </button>
+                <button
+                  onClick={() => setShowActivation(true)}
+                  className="tap glass w-full mt-2 py-2.5 rounded-xl text-[12.5px] font-bold text-white/85 halo-gold"
+                  style={{ borderColor: 'var(--stroke)' }}
+                >
+                  J'ai déjà un code d'activation
+                </button>
+                <div className="text-[10.5px] text-white/45 text-center mt-2">
+                  Mobile Money Cameroun · Activation manuelle sous 24h
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -670,6 +729,41 @@ const ProfileTab = ({
             >
               {codeWord ? 'Enregistré' : 'Plus tard'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Activation Premium par code */}
+      {showActivation && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center">
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setShowActivation(false)}
+          />
+          <div
+            className="relative w-full max-w-md glass-strong rounded-t-3xl p-5"
+            style={{ borderBottom: 0 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <ICrown size={18} className="text-[color:var(--gold)]" />
+                <div className="text-[16px] font-extrabold text-grad-gold font-display">
+                  Activer Premium
+                </div>
+              </div>
+              <button
+                onClick={() => setShowActivation(false)}
+                className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
+                style={{ borderColor: 'var(--stroke)' }}
+              >
+                <IX size={16} />
+              </button>
+            </div>
+            <ActivationCodeSheet
+              activateCode={premiumStatus?.activateCode}
+              onClose={() => setShowActivation(false)}
+            />
           </div>
         </div>
       )}

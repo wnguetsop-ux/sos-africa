@@ -14,6 +14,8 @@ import { useAlertHistory } from './hooks/useAlertHistory';
 import { useI18n } from './hooks/useI18n';
 import { useTheme } from './hooks/useTheme';
 import { useAnalytics } from './hooks/useAnalytics';
+import { usePremiumStatus } from './hooks/usePremiumStatus';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 // New design components
 import AppHeader from './components/ui/AppHeader';
@@ -166,6 +168,16 @@ const App = () => {
   const { language, setLanguage, t } = useI18n();
   const { theme, setTheme, isDark } = useTheme();
   const analytics = useAnalytics();
+  // Premium status (manual code activation)
+  const userId =
+    userProfile?.firstName ||
+    userProfile?.getFullName?.() ||
+    'anonyme';
+  const premiumStatus = usePremiumStatus(userId);
+  const { isPremium, limits: premiumLimits } = premiumStatus;
+  // Push notifications (FCM) - only request when user is interactive,
+  // so we don't spam permission popup at boot.
+  const pushNotifs = usePushNotifications(userId);
 
   // Shake detection
   const handleShake = useCallback(() => {
@@ -499,6 +511,9 @@ const App = () => {
             sendSMS={sendSMS}
             location={location}
             userProfile={userProfile}
+            isPremium={isPremium}
+            premiumLimits={premiumLimits}
+            onUpgrade={() => setShowPremium(true)}
           />
         )}
 
@@ -526,6 +541,8 @@ const App = () => {
             isDark={isDark}
             userProfile={userProfile}
             alertHistory={alertHistory}
+            premiumStatus={premiumStatus}
+            pushNotifs={pushNotifs}
             onDonate={() => setShowDonation(true)}
             onUpgrade={() => setShowPremium(true)}
             onAdminTap={() => setAdminTapCount((p) => p + 1)}

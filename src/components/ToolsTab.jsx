@@ -22,6 +22,7 @@ import AudioSheet from './sheets/AudioSheet';
 import VideoSheet from './sheets/VideoSheet';
 import FamilySheet from './sheets/FamilySheet';
 import AISheet from './sheets/AISheet';
+import PremiumGate from './ui/PremiumGate';
 
 const ACCENT = {
   red: 'var(--red)',
@@ -103,6 +104,9 @@ const ToolsTab = ({
   sendSMS,
   location,
   userProfile,
+  isPremium = false,
+  premiumLimits = null,
+  onUpgrade,
 }) => {
   const [activeSheet, setActiveSheet] = useState(null);
   const [selectedCaller, setSelectedCaller] = useState('Maman');
@@ -217,6 +221,7 @@ const ToolsTab = ({
       icon: IVideo,
       color: 'red',
       title: t ? t('tools.videoLive') || 'SOS vidéo live' : 'SOS vidéo live',
+      badge: !isPremium ? 'PREMIUM' : null,
       desc: t
         ? t('tools.videoLiveDesc') || 'Diffusez votre vidéo en direct.'
         : 'Diffusez votre vidéo en direct.',
@@ -519,6 +524,12 @@ const ToolsTab = ({
                 location={location}
                 sendSMS={sendSMS}
                 journeyHook={journeyHook}
+                isPremium={isPremium}
+                maxMembers={premiumLimits?.family?.maxMembers || 2}
+                onUpgrade={() => {
+                  closeSheet();
+                  setTimeout(() => onUpgrade && onUpgrade(), 80);
+                }}
                 onClose={closeSheet}
               />
             )}
@@ -621,19 +632,40 @@ const ToolsTab = ({
             )}
 
             {activeSheet === 'video' && (
-              <VideoSheet
-                contacts={contacts}
-                sendSMS={sendSMS}
-                location={location}
-                userProfile={userProfile}
-                onClose={closeSheet}
-              />
+              <PremiumGate
+                isPremium={isPremium}
+                title="SOS Vidéo Live"
+                description="Diffuse une vidéo en direct à tes contacts d'urgence — uniquement pour les membres Premium."
+                benefits={[
+                  'Vidéo + audio HD jusqu\'à 10 minutes',
+                  'Upload automatique sur cloud sécurisé',
+                  'Lien partagé par SMS aux contacts',
+                  'Caméra avant ou arrière',
+                ]}
+                onUpgrade={() => {
+                  closeSheet();
+                  setTimeout(() => onUpgrade && onUpgrade(), 80);
+                }}
+              >
+                <VideoSheet
+                  contacts={contacts}
+                  sendSMS={sendSMS}
+                  location={location}
+                  userProfile={userProfile}
+                  onClose={closeSheet}
+                />
+              </PremiumGate>
             )}
 
             {activeSheet === 'ai' && (
               <AISheet
                 location={location}
                 language={t ? 'fr' : 'fr'}
+                isPremium={isPremium}
+                onUpgrade={() => {
+                  closeSheet();
+                  setTimeout(() => onUpgrade && onUpgrade(), 80);
+                }}
                 onAction={(actionId) => {
                   // Map AI suggested actions to app handlers
                   if (actionId === 'siren') {

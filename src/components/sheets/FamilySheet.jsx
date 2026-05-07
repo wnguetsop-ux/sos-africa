@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { IFamily, ICopy, IShare, IPin, IBell, ICheck, IPlay, IX } from '../ui/icons';
+import { IFamily, ICopy, IShare, IPin, IBell, ICheck, IPlay, IX, ICrown } from '../ui/icons';
 import { db } from '../../firebase/config';
 import {
   doc,
@@ -16,7 +16,16 @@ import {
 // Random short code for invite (6 chars)
 const genCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
-const FamilySheet = ({ userProfile, location, sendSMS, journeyHook, onClose }) => {
+const FamilySheet = ({
+  userProfile,
+  location,
+  sendSMS,
+  journeyHook,
+  isPremium = false,
+  maxMembers = 2,
+  onUpgrade,
+  onClose,
+}) => {
   const [familyId, setFamilyId] = useState(() => localStorage.getItem('sos_family_id') || '');
   const [members, setMembers] = useState([]);
   const [pinging, setPinging] = useState(null);
@@ -131,6 +140,8 @@ const FamilySheet = ({ userProfile, location, sendSMS, journeyHook, onClose }) =
     setFamilyId('');
     setMembers([]);
   };
+
+  const memberLimitReached = members.length >= maxMembers;
 
   const copyCode = async () => {
     try {
@@ -271,10 +282,34 @@ const FamilySheet = ({ userProfile, location, sendSMS, journeyHook, onClose }) =
             <IShare size={12} /> Inviter
           </button>
         </div>
-        <div className="text-[10.5px] text-white/55 mt-2">
-          {members.length} membre{members.length > 1 ? 's' : ''} dans le cercle
+        <div className="text-[10.5px] text-white/55 mt-2 flex items-center gap-1.5">
+          {members.length} / {isPremium ? maxMembers : 2} membre{members.length > 1 ? 's' : ''}
+          {!isPremium && (
+            <span className="text-white/40">· Premium = jusqu'à 5</span>
+          )}
         </div>
       </div>
+
+      {!isPremium && memberLimitReached && (
+        <div
+          className="rounded-xl p-3 flex items-center gap-2"
+          style={{
+            background: 'linear-gradient(135deg, rgba(244,194,75,.16), rgba(244,194,75,.04))',
+            border: '1px solid rgba(244,194,75,.4)',
+          }}
+        >
+          <ICrown size={16} className="text-[color:var(--gold)] shrink-0" />
+          <div className="flex-1 text-[11.5px] text-white/85 leading-snug">
+            Limite gratuite atteinte ({maxMembers} membres). Premium = jusqu'à 5.
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="tap btn-primary-gold px-3 py-1.5 rounded-lg text-[11px] font-extrabold shrink-0"
+          >
+            Passer
+          </button>
+        </div>
+      )}
 
       {/* Members list */}
       <div className="space-y-2">
