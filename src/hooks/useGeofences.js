@@ -136,6 +136,22 @@ export const useGeofences = ({ familyId, location, userId, userName, enabled = t
             timestamp: serverTimestamp(),
           }).catch(() => {});
         } catch {}
+
+        // Push aux autres membres famille via le serveur (no-op si pas configuré)
+        try {
+          fetch('/api/push/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              familyId,
+              title: isInside
+                ? `📍 ${userName || 'Un membre'} est arrivé`
+                : `🚪 ${userName || 'Un membre'} vient de partir`,
+              body: `${isInside ? 'Arrivée à' : 'Sortie de'} ${g.name || 'la zone'}`,
+              data: { url: '/?tab=tools' },
+            }),
+          }).catch(() => {});
+        } catch {}
       }
     });
 

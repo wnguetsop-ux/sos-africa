@@ -19,8 +19,7 @@ const PLANS = [
 
 const METHODS = [
   { id: 'momo', label: 'Mobile Money', sub: 'MTN · Orange', emoji: '📱' },
-  { id: 'card', label: 'Carte bancaire', sub: 'Bientôt', emoji: '💳', disabled: true },
-  { id: 'paypal', label: 'PayPal', sub: 'Bientôt', emoji: '🅿️', disabled: true },
+  { id: 'card', label: 'Carte', sub: 'Stripe sécurisé', emoji: '💳' },
 ];
 
 const MOMO_NUMBER = '651495483';
@@ -66,6 +65,36 @@ const PremiumModal = ({ isOpen, onClose, t, userProfile }) => {
   };
 
   const submitPayment = async () => {
+    if (method === 'card') {
+      // Stripe Checkout
+      setUploading(true);
+      setUploadError(null);
+      try {
+        const userId = userProfile?.firstName || userProfile?.getFullName?.() || 'anonymous';
+        const res = await fetch('/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plan: selected.id,
+            userId,
+            origin: window.location.origin,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.url) {
+          throw new Error(
+            data.hint || data.error || 'Stripe non configuré sur le serveur'
+          );
+        }
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } catch (err) {
+        console.error('Stripe checkout failed:', err);
+        setUploadError(err.message || 'Échec de la redirection Stripe');
+        setUploading(false);
+      }
+      return;
+    }
     if (method === 'momo') {
       if (!screenshot || !phone.trim()) {
         setUploadError('Numéro et capture requis');
@@ -201,7 +230,7 @@ const PremiumModal = ({ isOpen, onClose, t, userProfile }) => {
                     <div className="text-[11px] uppercase tracking-[0.2em] font-extrabold text-white/50 mb-2 px-1">
                       Méthode de paiement
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {METHODS.map((m) => (
                         <button
                           key={m.id}
@@ -357,14 +386,20 @@ const PremiumModal = ({ isOpen, onClose, t, userProfile }) => {
                   )}
 
                   {method === 'card' && (
-                    <div className="text-[12.5px] text-white/65 mb-3 text-center py-4">
-                      🚧 Paiement par carte arrive bientôt — utilise Mobile Money en attendant.
-                    </div>
-                  )}
-
-                  {method === 'paypal' && (
-                    <div className="text-[12.5px] text-white/65 mb-3 text-center py-4">
-                      🚧 PayPal arrive bientôt — utilise Mobile Money en attendant.
+                    <div
+                      className="rounded-2xl p-4 mb-3 text-center relative overflow-hidden"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(99,91,255,.16), rgba(99,91,255,.04))',
+                        border: '1px solid rgba(99,91,255,.4)',
+                      }}
+                    >
+                      <div className="text-3xl mb-2">💳</div>
+                      <div className="text-[14px] font-extrabold text-white font-display mb-1">
+                        Paiement carte sécurisé
+                      </div>
+                      <div className="text-[11.5px] text-white/65 leading-snug">
+                        Tu seras redirigé vers Stripe pour saisir ta carte. Activation Premium automatique après paiement.
+                      </div>
                     </div>
                   )}
 
@@ -381,7 +416,11 @@ const PremiumModal = ({ isOpen, onClose, t, userProfile }) => {
                       disabled={uploading || (method === 'momo' && (!screenshot || !phone.trim()))}
                       className="tap btn-primary-gold flex-1 py-3 rounded-xl text-[13px] font-extrabold flex items-center justify-center gap-1.5 font-display disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {uploading ? 'Envoi…' : 'Envoyer la preuve'}
+                      {uploading
+                        ? 'Redirection…'
+                        : method === 'card'
+                        ? `Payer ${selected.priceEUR}`
+                        : 'Envoyer la preuve'}
                     </button>
                   </div>
                 </>

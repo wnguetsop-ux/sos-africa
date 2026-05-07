@@ -12,6 +12,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
+import { sendServerPush } from '../../hooks/useServerPush';
 
 // Random short code for invite (6 chars)
 const genCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -252,6 +253,13 @@ const FamilySheet = ({
         message: 'Ça va ? Réponds-moi 🙏',
         sentAt: serverTimestamp(),
         responded: false,
+      });
+      // Push serveur vers le destinataire (no-op si FCM pas configuré)
+      sendServerPush({
+        userIds: [member.id],
+        title: `🙏 ${userName} demande de tes nouvelles`,
+        body: 'Touche pour répondre depuis SOS Africa.',
+        data: { url: '/?tab=tools' },
       });
       setTimeout(() => setPinging(null), 1500);
     } catch (err) {
