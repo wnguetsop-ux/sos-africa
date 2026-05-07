@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { IFamily, ICopy, IShare, IPin, IBell, ICheck, IPlay, IX, ICrown } from '../ui/icons';
+import { IFamily, ICopy, IShare, IPin, IBell, ICheck, IPlay, IX, ICrown, IPhone, IPlus, ITrash, IWhatsapp, IMessage } from '../ui/icons';
 import { db } from '../../firebase/config';
 import {
   doc,
@@ -33,6 +33,37 @@ const FamilySheet = ({
   const [creating, setCreating] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState(null);
+  // Invitations enfants/proches (stockees localement)
+  const [invitees, setInvitees] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('sos_family_invitees') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [showAddInvitee, setShowAddInvitee] = useState(false);
+  const [newInviteeName, setNewInviteeName] = useState('');
+  const [newInviteePhone, setNewInviteePhone] = useState('');
+
+  const persistInvitees = (next) => {
+    setInvitees(next);
+    try {
+      localStorage.setItem('sos_family_invitees', JSON.stringify(next));
+    } catch {}
+  };
+
+  // Auto-detect deep-link ?join=CODE and prefill the join field
+  useEffect(() => {
+    if (familyId) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('join');
+      if (code && code.length >= 4) {
+        setJoinCode(code.toUpperCase());
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const userId =
     userProfile?.firstName ||
@@ -151,8 +182,18 @@ const FamilySheet = ({
     } catch {}
   };
 
+  const inviteUrl = familyId
+    ? `https://sos-africa.vercel.app/?join=${familyId}`
+    : 'https://sos-africa.vercel.app/';
+
+  const inviteMessage = (forName) =>
+    `${forName ? `Salut ${forName}! ` : ''}Rejoins ma famille SOS Africa pour qu'on puisse veiller les uns sur les autres en temps réel.\n\n` +
+    `📱 Installe l'app : ${inviteUrl}\n` +
+    `🔑 Code famille : ${familyId}\n\n` +
+    `Une fois installée, tape le code dans Outils → Mode famille.`;
+
   const shareInvite = async () => {
-    const text = `Rejoins ma famille SOS Africa avec le code : ${familyId}\nhttps://sos-africa.vercel.app`;
+    const text = inviteMessage();
     try {
       if (navigator.share) {
         await navigator.share({ title: 'SOS Africa Famille', text });
@@ -162,6 +203,42 @@ const FamilySheet = ({
         setTimeout(() => setCopied(false), 1800);
       }
     } catch {}
+  };
+
+  // Pre-format WhatsApp message for a specific phone number
+  const inviteViaWhatsApp = (phone, name) => {
+    const cleaned = (phone || '').replace(/[^0-9+]/g, '');
+    const msg = encodeURIComponent(inviteMessage(name));
+    const url = `https://wa.me/${cleaned.replace(/^\+/, '')}?text=${msg}`;
+    window.open(url, '_blank');
+  };
+
+  const inviteViaSMS = (phone, name) => {
+    const cleaned = (phone || '').replace(/[^0-9+]/g, '');
+    const msg = encodeURIComponent(inviteMessage(name));
+    window.location.href = `sms:${cleaned}?body=${msg}`;
+  };
+
+  const addInvitee = () => {
+    if (!newInviteeName.trim() || !newInviteePhone.trim()) return;
+    const next = [
+      ...invitees,
+      {
+        id: `inv_${Date.now()}`,
+        name: newInviteeName.trim(),
+        phone: newInviteePhone.trim(),
+        addedAt: Date.now(),
+        status: 'invited',
+      },
+    ];
+    persistInvitees(next);
+    setNewInviteeName('');
+    setNewInviteePhone('');
+    setShowAddInvitee(false);
+  };
+
+  const removeInvitee = (id) => {
+    persistInvitees(invitees.filter((i) => i.id !== id));
   };
 
   const pingMember = async (member) => {
@@ -311,10 +388,171 @@ const FamilySheet = ({
         </div>
       )}
 
+      {/* Mes proches à inviter (carnet local) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1 mt-1">
+          <div className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/45">
+            Mes proches à inviter
+          </div>
+          <button
+            onClick={() => setShowAddInvitee(true)}
+            className="tap text-[11px] font-extrabold flex items-center gap-1 px-2 py-1 rounded-lg"
+            style={{
+              color: 'var(--green)',
+              background: 'rgba(34,214,123,.12)',
+              border: '1px solid rgba(34,214,123,.35)',
+            }}
+          >
+            <IPlus size={11} /> Ajouter
+          </button>
+        </div>
+
+        {invitees.length === 0 && !showAddInvitee && (
+          <button
+            onClick={() => setShowAddInvitee(true)}
+            className="tap glass w-full rounded-xl p-3 flex flex-col items-center gap-1 halo-green"
+            style={{ borderColor: 'var(--stroke)' }}
+          >
+            <IPhone size={18} className="text-[color:var(--green)]" />
+            <div className="text-[12.5px] font-bold text-white">
+              Ajoute le numéro de tes enfants
+            </div>
+            <div className="text-[11px] text-white/55 text-center">
+              Tu pourras leur envoyer le lien d'invitation par WhatsApp
+            </div>
+          </button>
+        )}
+
+        {showAddInvitee && (
+          <div
+            className="glass rounded-xl p-3 space-y-2"
+            style={{ borderColor: 'rgba(34,214,123,.4)' }}
+          >
+            <input
+              value={newInviteeName}
+              onChange={(e) => setNewInviteeName(e.target.value)}
+              placeholder="Prénom (ex: Jean, Sarah)"
+              className="w-full px-3 py-2.5 rounded-lg glass text-[13px] text-white placeholder-white/40"
+              style={{ borderColor: 'var(--stroke)' }}
+            />
+            <input
+              type="tel"
+              value={newInviteePhone}
+              onChange={(e) => setNewInviteePhone(e.target.value)}
+              placeholder="+237 6XX XX XX XX"
+              className="w-full px-3 py-2.5 rounded-lg glass text-[13px] text-white placeholder-white/40 font-mono"
+              style={{ borderColor: 'var(--stroke)' }}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowAddInvitee(false);
+                  setNewInviteeName('');
+                  setNewInviteePhone('');
+                }}
+                className="tap glass flex-1 py-2 rounded-lg text-[12px] font-bold text-white/85"
+                style={{ borderColor: 'var(--stroke)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={addInvitee}
+                disabled={!newInviteeName.trim() || !newInviteePhone.trim()}
+                className="tap btn-primary-green flex-1 py-2 rounded-lg text-[12px] font-extrabold disabled:opacity-50"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {invitees.map((inv) => {
+          // Detect if this person joined the family
+          const joined = members.some(
+            (m) =>
+              (m.name || '').toLowerCase().trim() ===
+              inv.name.toLowerCase().trim()
+          );
+          return (
+            <div
+              key={inv.id}
+              className="glass rounded-xl p-3 flex items-center gap-2.5"
+              style={{ borderColor: 'var(--stroke)' }}
+            >
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-[13px] shrink-0"
+                style={{
+                  background: joined
+                    ? 'linear-gradient(135deg,#22D67B,#0a4a2c)'
+                    : 'linear-gradient(135deg,#FF7B5B,#3a1a10)',
+                }}
+              >
+                {inv.name.slice(0, 1).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-bold text-white truncate flex items-center gap-1">
+                  {inv.name}
+                  {joined && (
+                    <span
+                      className="inline-block px-1.5 py-0.5 rounded text-[8.5px] font-extrabold"
+                      style={{
+                        color: 'var(--green)',
+                        background: 'rgba(34,214,123,.14)',
+                        border: '1px solid rgba(34,214,123,.4)',
+                      }}
+                    >
+                      ✓ INSCRIT
+                    </span>
+                  )}
+                </div>
+                <div className="text-[10.5px] text-white/55 font-mono">
+                  {inv.phone}
+                </div>
+              </div>
+              {!joined && (
+                <>
+                  <button
+                    onClick={() => inviteViaWhatsApp(inv.phone, inv.name)}
+                    className="tap w-9 h-9 rounded-full flex items-center justify-center halo-green shrink-0"
+                    style={{
+                      background: 'rgba(34,214,123,.12)',
+                      color: 'var(--green)',
+                      border: '1px solid rgba(34,214,123,.35)',
+                    }}
+                    aria-label="Inviter par WhatsApp"
+                  >
+                    <IWhatsapp size={14} />
+                  </button>
+                  <button
+                    onClick={() => inviteViaSMS(inv.phone, inv.name)}
+                    className="tap w-9 h-9 rounded-full flex items-center justify-center halo-blue shrink-0"
+                    style={{
+                      background: 'rgba(61,139,255,.12)',
+                      color: 'var(--blue)',
+                      border: '1px solid rgba(61,139,255,.35)',
+                    }}
+                    aria-label="Inviter par SMS"
+                  >
+                    <IMessage size={14} />
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => removeInvitee(inv.id)}
+                className="tap text-white/40 hover:text-white/70 px-1 shrink-0"
+                aria-label="Supprimer"
+              >
+                <ITrash size={12} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Members list */}
       <div className="space-y-2">
         <div className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/45 px-1 mt-1">
-          Membres
+          Membres connectés
         </div>
         {members.length === 0 && (
           <p className="text-[12px] text-white/55 text-center py-3">

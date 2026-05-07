@@ -345,31 +345,36 @@ const ToolsTab = ({
         </div>
       )}
 
-      {/* Bottom sheets */}
+      {/* Full-screen modal sheets — visible immediately, no scroll needed */}
       {activeSheet && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center">
+        <div
+          className="fixed inset-0 z-40 flex flex-col"
+          style={{
+            background:
+              'radial-gradient(140% 90% at 50% -20%, rgba(255,46,63,.10), transparent 55%), linear-gradient(180deg, #06080F 0%, #04060B 60%, #03050A 100%)',
+            animation: 'screen-in 0.25s ease-out both',
+          }}
+        >
           <div
-            className="absolute inset-0"
-            style={{ background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(8px)' }}
-            onClick={closeSheet}
-          />
-          <div className="relative w-full max-w-md glass-strong rounded-t-3xl p-5 mb-0 max-h-[80vh] overflow-y-auto no-scrollbar"
-               style={{ borderBottom: 0 }}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-[16px] font-extrabold text-white font-display">
-                {activeSheet === 'fakecall' ? (t ? t('tools.fakeCall') : 'Faux appel') : null}
-                {activeSheet === 'plate' ? (t ? t('tools.plate') : 'Photo plaque') : null}
+            className="relative w-full max-w-md mx-auto px-4 pt-3 pb-4 flex flex-col flex-1 min-h-0"
+            style={{ borderBottom: 0 }}>
+            <div className="flex items-center gap-2 mb-3 flex-shrink-0 pt-1">
+              <button onClick={closeSheet} className="tap w-10 h-10 rounded-full glass flex items-center justify-center text-white/85"
+                      style={{ borderColor: 'var(--stroke)' }} aria-label="Retour">
+                <IChevronRight size={18} style={{ transform: 'rotate(180deg)' }} />
+              </button>
+              <div className="text-[18px] font-extrabold text-white font-display flex-1">
+                {activeSheet === 'fakecall' ? 'Faux appel' : null}
+                {activeSheet === 'plate' ? 'Photo plaque' : null}
                 {activeSheet === 'family' ? 'Mode famille' : null}
                 {activeSheet === 'audio' ? 'Enregistrement audio' : null}
-                {activeSheet === 'history' ? (t ? t('tools.history') : 'Historique') : null}
+                {activeSheet === 'history' ? 'Historique' : null}
                 {activeSheet === 'video' ? 'SOS vidéo live' : null}
-                {activeSheet === 'ai' ? (t ? t('tools.ai') : 'Assistant IA') : null}
+                {activeSheet === 'ai' ? 'Assistant IA' : null}
               </div>
-              <button onClick={closeSheet} className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
-                      style={{ borderColor: 'var(--stroke)' }}>
-                <IX size={16} />
-              </button>
             </div>
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-6"
+                 style={{ WebkitOverflowScrolling: 'touch' }}>
 
             {activeSheet === 'fakecall' && (
               <div className="space-y-4">
@@ -697,6 +702,7 @@ const ToolsTab = ({
                 }}
               />
             )}
+            </div>
           </div>
         </div>
       )}

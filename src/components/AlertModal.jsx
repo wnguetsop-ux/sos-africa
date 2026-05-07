@@ -448,19 +448,13 @@ const AlertModal = ({
   isPremium,
   t,
 }) => {
-  const [phase, setPhase] = useState('active'); // 'active' | 'success'
+  const [forceSuccess, setForceSuccess] = useState(false);
 
-  // When countDown reaches 0, parent's executeEmergencyActions runs.
-  // Show "success" once countDown has finished its run.
-  useEffect(() => {
-    if (countDown === 0 && phase === 'active') {
-      // small delay so the user sees the SOS bubble settle
-      const id = setTimeout(() => setPhase('success'), 600);
-      return () => clearTimeout(id);
-    }
-  }, [countDown, phase]);
+  // Phase derivee : success quand countDown atteint 0 OU quand l'utilisateur
+  // clique 'Envoyer maintenant'. Pas de delai (evite le flash blanc).
+  const phase = forceSuccess || countDown === 0 ? 'success' : 'active';
 
-  const skipToSuccess = () => setPhase('success');
+  const skipToSuccess = () => setForceSuccess(true);
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center"
