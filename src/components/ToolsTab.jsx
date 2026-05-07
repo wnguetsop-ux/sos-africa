@@ -18,6 +18,9 @@ import {
   IClock,
 } from './ui/icons';
 import { ScreenHeading } from './ui/atoms';
+import AudioSheet from './sheets/AudioSheet';
+import VideoSheet from './sheets/VideoSheet';
+import FamilySheet from './sheets/FamilySheet';
 
 const ACCENT = {
   red: 'var(--red)',
@@ -98,6 +101,7 @@ const ToolsTab = ({
   contacts,
   sendSMS,
   location,
+  userProfile,
 }) => {
   const [activeSheet, setActiveSheet] = useState(null);
   const [selectedCaller, setSelectedCaller] = useState('Maman');
@@ -255,7 +259,7 @@ const ToolsTab = ({
       desc: t
         ? t('tools.familyDesc') || 'Restez connecté à vos proches.'
         : 'Restez connecté à vos proches.',
-      onClick: () => setActiveSheet('journey'),
+      onClick: () => setActiveSheet('family'),
       badge: journeyHook?.isActive ? 'ACTIF' : null,
     },
     {
@@ -276,10 +280,7 @@ const ToolsTab = ({
       desc: t
         ? t('tools.audioDesc') || 'Capturez de l\'audio discrètement.'
         : 'Capturez de l\'audio discrètement.',
-      onClick: () =>
-        audioRecording?.isRecording
-          ? audioRecording.stopRecording()
-          : audioRecording?.startRecording(),
+      onClick: () => setActiveSheet('audio'),
       badge: audioRecording?.isRecording ? '● REC' : null,
     },
     {
@@ -352,9 +353,10 @@ const ToolsTab = ({
               <div className="text-[16px] font-extrabold text-white font-display">
                 {activeSheet === 'fakecall' ? (t ? t('tools.fakeCall') : 'Faux appel') : null}
                 {activeSheet === 'plate' ? (t ? t('tools.plate') : 'Photo plaque') : null}
-                {activeSheet === 'journey' ? (t ? t('tools.family') : 'Mode famille') : null}
+                {activeSheet === 'family' ? 'Mode famille' : null}
+                {activeSheet === 'audio' ? 'Enregistrement audio' : null}
                 {activeSheet === 'history' ? (t ? t('tools.history') : 'Historique') : null}
-                {activeSheet === 'video' ? (t ? t('tools.videoLive') : 'SOS vidéo live') : null}
+                {activeSheet === 'video' ? 'SOS vidéo live' : null}
                 {activeSheet === 'ai' ? (t ? t('tools.ai') : 'Assistant IA') : null}
               </div>
               <button onClick={closeSheet} className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
@@ -510,70 +512,24 @@ const ToolsTab = ({
               </div>
             )}
 
-            {activeSheet === 'journey' && (
-              <div className="space-y-3">
-                {journeyHook?.isActive ? (
-                  <>
-                    <div className="glass rounded-xl p-3" style={{ borderColor: 'var(--stroke)' }}>
-                      <div className="text-[13px] font-bold text-white">🚗 Trajet en cours</div>
-                      <div className="text-[12px] text-white/60">
-                        Destination : {journeyHook.destination}
-                      </div>
-                      <div className="text-[12px] text-white/60">
-                        Temps : {journeyHook.elapsedTime} / {journeyHook.estimatedTime} min
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => journeyHook.checkIn()} className="tap btn-primary-green flex-1 py-3 rounded-xl font-bold">
-                        Je suis OK
-                      </button>
-                      <button onClick={() => journeyHook.stopJourney(true)} className="tap btn-primary-red flex-1 py-3 rounded-xl font-bold">
-                        Terminer
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      type="text"
-                      value={journeyDest}
-                      onChange={(e) => setJourneyDest(e.target.value)}
-                      placeholder="Destination (ex: Maison, Bureau…)"
-                      className="w-full px-3 py-2.5 rounded-xl glass text-[13px] text-white/90 placeholder-white/40"
-                      style={{ borderColor: 'var(--stroke)' }}
-                    />
-                    <div className="flex gap-2">
-                      {[15, 30, 45, 60].map((time) => (
-                        <button
-                          key={time}
-                          onClick={() => setJourneyTime(time)}
-                          className="tap flex-1 py-2 rounded-xl text-[12px] font-bold"
-                          style={{
-                            color: journeyTime === time ? 'var(--blue)' : 'rgba(255,255,255,.6)',
-                            background:
-                              journeyTime === time ? 'rgba(61,139,255,.12)' : 'transparent',
-                            border: `1px solid ${
-                              journeyTime === time ? 'rgba(61,139,255,.4)' : 'var(--stroke)'
-                            }`,
-                          }}
-                        >
-                          {time}m
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (!journeyDest.trim()) return;
-                        const ok = journeyHook?.startJourney?.(journeyDest, journeyTime, null);
-                        if (ok) closeSheet();
-                      }}
-                      className="tap btn-primary-green w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2"
-                    >
-                      <IPlay size={15} /> Démarrer le trajet
-                    </button>
-                  </>
-                )}
-              </div>
+            {activeSheet === 'family' && (
+              <FamilySheet
+                userProfile={userProfile}
+                location={location}
+                sendSMS={sendSMS}
+                journeyHook={journeyHook}
+                onClose={closeSheet}
+              />
+            )}
+
+            {activeSheet === 'audio' && (
+              <AudioSheet
+                audioRecording={audioRecording}
+                contacts={contacts}
+                sendSMS={sendSMS}
+                location={location}
+                onClose={closeSheet}
+              />
             )}
 
             {activeSheet === 'history' && (
@@ -664,14 +620,13 @@ const ToolsTab = ({
             )}
 
             {activeSheet === 'video' && (
-              <div className="space-y-3">
-                <p className="text-[12.5px] text-white/65">
-                  Cette fonction Premium diffuse votre vidéo aux contacts en temps réel pendant une alerte.
-                </p>
-                <button onClick={closeSheet} className="tap btn-primary-red w-full py-3 rounded-xl font-bold">
-                  Fermer
-                </button>
-              </div>
+              <VideoSheet
+                contacts={contacts}
+                sendSMS={sendSMS}
+                location={location}
+                userProfile={userProfile}
+                onClose={closeSheet}
+              />
             )}
 
             {activeSheet === 'ai' && (

@@ -423,8 +423,10 @@ const App = () => {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="flex flex-col"
       style={{
+        height: '100dvh',
+        minHeight: '100vh',
         background:
           'radial-gradient(140% 90% at 50% -20%, rgba(255,46,63,.10), transparent 55%), linear-gradient(180deg, #06080F 0%, #04060B 60%, #03050A 100%)',
         color: 'var(--text)',
@@ -441,7 +443,10 @@ const App = () => {
         />
       )}
 
-      <main className="flex-1 overflow-y-auto pb-28 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <main
+        className="flex-1 min-h-0 overflow-y-auto pb-28 overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+      >
         {activeTab === 'home' && (
           <HomeTab
             location={location}
@@ -484,6 +489,7 @@ const App = () => {
             contacts={contacts}
             sendSMS={sendSMS}
             location={location}
+            userProfile={userProfile}
           />
         )}
 
@@ -571,7 +577,12 @@ const App = () => {
         isDark={isDark}
       />
 
-      <PremiumModal isOpen={showPremium} onClose={() => setShowPremium(false)} t={t} />
+      <PremiumModal
+        isOpen={showPremium}
+        onClose={() => setShowPremium(false)}
+        t={t}
+        userProfile={userProfile}
+      />
     </div>
   );
 };
