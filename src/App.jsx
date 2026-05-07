@@ -479,6 +479,7 @@ const App = () => {
             refreshGPS={refreshGPS}
             contacts={contacts}
             sendSMS={sendSMS}
+            userProfile={userProfile}
             t={t}
           />
         )}

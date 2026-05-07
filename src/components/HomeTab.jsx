@@ -205,8 +205,66 @@ const HomeTab = ({
       : geoInfo?.line || placeShort;
 
   return (
-    <div className="screen-in flex flex-col px-0 pb-32">
-      <div className="px-5 pb-2">
+    <div
+      className="screen-in flex flex-col px-0 pb-32 relative"
+      style={{ isolation: 'isolate' }}
+    >
+      {/* Cameroon backdrop — subtle, behind everything, doesn't break design */}
+      <div
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+        style={{ zIndex: -1 }}
+        aria-hidden
+      >
+        {/* Photo Cameroun (Mont Cameroun + paysage) en très faible opacité */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "url('https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=1200&q=80')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: 0.10,
+            filter: 'saturate(80%) contrast(110%)',
+            mixBlendMode: 'screen',
+          }}
+        />
+        {/* Voile dégradé pour fondre l'image dans le thème dark */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(4,6,11,0.55) 0%, rgba(4,6,11,0.85) 60%, rgba(4,6,11,1) 100%)',
+          }}
+        />
+        {/* Drapeau Cameroun ultra-discret en haut à droite */}
+        <div
+          className="absolute top-3 right-3 flex flex-col rounded overflow-hidden"
+          style={{
+            width: 22,
+            height: 14,
+            opacity: 0.5,
+            boxShadow: '0 0 8px rgba(0,0,0,.4)',
+          }}
+        >
+          <div style={{ flex: 1, background: '#007A5E' }} />
+          <div style={{ flex: 1, background: '#CE1126', position: 'relative' }}>
+            <span
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                color: '#FCD116',
+                fontSize: 6,
+                lineHeight: 1,
+              }}
+            ></span>
+          </div>
+          <div style={{ flex: 1, background: '#FCD116' }} />
+        </div>
+      </div>
+
+      <div className="relative z-10 px-5 pb-2">
         <div
           className="text-[22px] font-extrabold text-white leading-tight font-display"
           style={{ letterSpacing: '-.01em' }}

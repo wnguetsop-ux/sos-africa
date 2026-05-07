@@ -18,6 +18,8 @@ import {
 import { Tag } from './ui/atoms';
 import LeafletMap from './ui/LeafletMap';
 import { useReverseGeocode } from '../hooks/useReverseGeocode';
+import { useRiskZones } from '../hooks/useRiskZones';
+import RiskReportSheet from './sheets/RiskReportSheet';
 
 const LayerRow = ({ icon: Icn, color, label, defOn = false, onChange }) => {
   const [on, setOn] = useState(defOn);
@@ -58,7 +60,10 @@ const LayerRow = ({ icon: Icn, color, label, defOn = false, onChange }) => {
   );
 };
 
-const LocationTab = ({ location, gpsLoading, refreshGPS, contacts, sendSMS, t }) => {
+const LocationTab = ({ location, gpsLoading, refreshGPS, contacts, sendSMS, userProfile, t }) => {
+  const [showReport, setShowReport] = useState(false);
+  const { zones, reportZone, confirmZone, RISK_TYPES: TYPES } = useRiskZones(location, 15);
+  const userId = userProfile?.firstName || userProfile?.getFullName?.() || 'anonyme';
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -164,7 +169,37 @@ const LocationTab = ({ location, gpsLoading, refreshGPS, contacts, sendSMS, t })
         className="mx-5 rounded-2xl relative overflow-hidden glass"
         style={{ height: 380, borderColor: 'var(--stroke)' }}
       >
-        <LeafletMap lat={lat} lng={lng} height={380} className="w-full h-full" />
+        <LeafletMap
+          lat={lat}
+          lng={lng}
+          height={380}
+          className="w-full h-full"
+          riskZones={zones}
+          onZoneClick={(z) => confirmZone && confirmZone(z.id, userId)}
+        />
+        {/* Compteur zones communautaires */}
+        {zones.length > 0 && (
+          <div
+            className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10.5px] font-bold flex items-center gap-1.5 glass z-[1000]"
+            style={{
+              color: 'var(--amber)',
+              borderColor: 'rgba(255,176,32,.35)',
+            }}
+          >
+            <IAlert size={11} />
+            {zones.length} zone{zones.length > 1 ? 's' : ''} signalée{zones.length > 1 ? 's' : ''}
+          </div>
+        )}
+        {/* Bouton signaler zone */}
+        <button
+          onClick={() => setShowReport(true)}
+          disabled={!lat}
+          className="tap absolute left-3 bottom-3 px-3.5 py-2.5 rounded-full btn-primary-red flex items-center gap-1.5 z-[1000] text-[12px] font-extrabold disabled:opacity-50"
+          aria-label="Signaler une zone à risque"
+        >
+          <IAlert size={14} />
+          Signaler
+        </button>
         {gpsLoading && (
           <div
             className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10.5px] font-bold flex items-center gap-1.5 glass z-[1000]"
@@ -330,6 +365,126 @@ const LocationTab = ({ location, gpsLoading, refreshGPS, contacts, sendSMS, t })
                 <div className="text-[16px] font-mono font-bold text-white">{lng.toFixed(6)}</div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Community zones list */}
+      {zones.length > 0 && (
+        <div className="px-5 mt-3">
+          <div className="glass rounded-2xl p-3.5">
+            <div className="flex items-center gap-2 mb-2.5">
+              <IAlert size={15} className="text-[color:var(--amber)]" />
+              <div className="text-[13px] font-bold text-white/90">
+                Signalements communautaires
+              </div>
+              <Tag color="amber" className="ml-auto">{zones.length}</Tag>
+            </div>
+            <div className="space-y-2">
+              {zones.slice(0, 8).map((z) => {
+                const meta = (TYPES || []).find((rt) => rt.id === z.type) || {
+                  emoji: '⚠️',
+                  label: z.type,
+                  color: 'amber',
+                };
+                const c =
+                  meta.color === 'red'
+                    ? 'var(--red)'
+                    : meta.color === 'amber'
+                    ? 'var(--amber)'
+                    : 'var(--blue)';
+                const dist = lat && lng && z.lat && z.lng
+                  ? Math.round(
+                      Math.sqrt(
+                        ((z.lat - lat) * 111) ** 2 +
+                          ((z.lng - lng) * 111 * Math.cos((lat * Math.PI) / 180)) ** 2
+                      ) * 1000
+                    )
+                  : null;
+                return (
+                  <div
+                    key={z.id}
+                    className="flex items-center gap-2.5 p-2.5 rounded-xl"
+                    style={{
+                      background: `color-mix(in oklab, ${c} 8%, transparent)`,
+                      border: `1px solid color-mix(in oklab, ${c} 30%, transparent)`,
+                    }}
+                  >
+                    <div className="text-[20px] leading-none shrink-0">{meta.emoji}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12.5px] font-bold text-white">
+                        {meta.label}
+                        {z.confirmations > 1 && (
+                          <span className="ml-1.5 text-[10px] font-bold" style={{ color: c }}>
+                            ×{z.confirmations}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10.5px] text-white/55 truncate">
+                        {z.note ? `${z.note} · ` : ''}
+                        {dist != null
+                          ? dist < 1000
+                            ? `${dist} m`
+                            : `${(dist / 1000).toFixed(1)} km`
+                          : ''}
+                      </div>
+                    </div>
+                    {!(z.confirmedBy || []).includes(userId) && (
+                      <button
+                        onClick={() => confirmZone(z.id, userId)}
+                        className="tap text-[11px] font-bold px-2.5 py-1 rounded-lg"
+                        style={{
+                          color: c,
+                          background: `color-mix(in oklab, ${c} 14%, transparent)`,
+                          border: `1px solid color-mix(in oklab, ${c} 40%, transparent)`,
+                        }}
+                      >
+                        Confirmer
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {zones.length > 8 && (
+              <div className="text-[10.5px] text-white/45 text-center mt-2">
+                +{zones.length - 8} zones supplémentaires sur la carte
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Risk report bottom sheet */}
+      {showReport && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center">
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setShowReport(false)}
+          />
+          <div
+            className="relative w-full max-w-md glass-strong rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto no-scrollbar"
+            style={{ borderBottom: 0 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-[16px] font-extrabold text-white font-display">
+                Signaler une zone
+              </div>
+              <button
+                onClick={() => setShowReport(false)}
+                className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
+                style={{ borderColor: 'var(--stroke)' }}
+              >
+                <IX size={16} />
+              </button>
+            </div>
+            <RiskReportSheet
+              location={location}
+              userProfile={userProfile}
+              reportZone={reportZone}
+              onClose={() => setShowReport(false)}
+            />
           </div>
         </div>
       )}

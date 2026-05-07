@@ -416,11 +416,12 @@ const ProfileTab = ({
                 Annuel <span className="text-[10px] font-extrabold ml-1" style={{ color: 'var(--green)' }}>-20%</span>
               </button>
             </div>
-            <div className="flex items-baseline gap-1">
-              <div className="text-[28px] font-extrabold text-grad-gold font-display">
-                {billing === 'monthly' ? '1,99 €' : '19 €'}
+            <div className="flex items-baseline gap-1.5">
+              <div className="text-[26px] font-extrabold text-grad-gold font-display leading-none">
+                {billing === 'monthly' ? '1 300' : '12 500'}
               </div>
-              <div className="text-[13px] text-white/65 font-semibold">
+              <div className="text-[14px] text-grad-gold font-bold">XAF</div>
+              <div className="text-[13px] text-white/65 font-semibold ml-1">
                 / {billing === 'monthly' ? 'mois' : 'an'}
               </div>
             </div>

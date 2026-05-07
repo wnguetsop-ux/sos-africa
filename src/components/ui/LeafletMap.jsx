@@ -4,11 +4,32 @@ const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.pn
 const ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
-const LeafletMap = ({ lat, lng, zoom = 15, height = 380, className = '', style = {} }) => {
+const ZONE_COLORS = {
+  theft: '#FF2E3F',
+  aggression: '#FF2E3F',
+  taxi: '#FFB020',
+  crowd: '#FFB020',
+  dark: '#FFB020',
+  protest: '#FFB020',
+  flood: '#3D8BFF',
+  other: '#FFB020',
+};
+
+const LeafletMap = ({
+  lat,
+  lng,
+  zoom = 15,
+  height = 380,
+  className = '',
+  style = {},
+  riskZones = [],
+  onZoneClick,
+}) => {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const ringsRef = useRef([]);
+  const zoneLayerRef = useRef(null);
 
   useEffect(() => {
     const init = () => {
@@ -64,6 +85,48 @@ const LeafletMap = ({ lat, lng, zoom = 15, height = 380, className = '', style =
       markerRef.current.setLatLng([lat, lng]);
     }
   }, [lat, lng, zoom]);
+
+  // Render community risk zones
+  useEffect(() => {
+    const L = window.L;
+    const map = mapRef.current;
+    if (!L || !map) return;
+
+    // Clear previous layer
+    if (zoneLayerRef.current) {
+      zoneLayerRef.current.clearLayers();
+    } else {
+      zoneLayerRef.current = L.layerGroup().addTo(map);
+    }
+
+    riskZones.forEach((z) => {
+      if (z.lat == null || z.lng == null) return;
+      const color = ZONE_COLORS[z.type] || '#FFB020';
+      // Stronger when more confirmations
+      const conf = Math.min(z.confirmations || 1, 10);
+      const radius = 80 + conf * 20; // m
+      const opacity = Math.min(0.18 + conf * 0.05, 0.55);
+
+      const circle = L.circle([z.lat, z.lng], {
+        radius,
+        color,
+        weight: 1.4,
+        fillColor: color,
+        fillOpacity: opacity,
+      });
+      circle.on('click', () => {
+        if (typeof onZoneClick === 'function') onZoneClick(z);
+      });
+      circle.addTo(zoneLayerRef.current);
+
+      // Tooltip
+      const label = `${z.note ? z.note.slice(0, 40) : 'Zone signalée'} · ${
+        z.confirmations || 1
+      } signalement${(z.confirmations || 1) > 1 ? 's' : ''}`;
+      circle.bindTooltip(label, { direction: 'top', offset: [0, -8] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [riskZones]);
 
   // Cleanup
   useEffect(() => {
