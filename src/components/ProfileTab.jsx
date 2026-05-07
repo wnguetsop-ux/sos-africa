@@ -556,6 +556,27 @@ const ProfileTab = ({
             color="gold"
           />
           <SettingRow
+            icon={IBell}
+            label="Notifications push"
+            value={
+              !pushNotifs?.supported
+                ? 'Non supporté sur cet appareil'
+                : pushNotifs.permission === 'granted'
+                ? '✅ Activées · ne rate plus une alerte famille'
+                : pushNotifs.permission === 'denied'
+                ? '⚠️ Refusées (active dans les paramètres du navigateur)'
+                : 'Touche pour activer'
+            }
+            onClick={async () => {
+              if (!pushNotifs?.supported) return;
+              if (pushNotifs.permission === 'granted') return;
+              await pushNotifs.requestPermission?.();
+            }}
+            color={
+              pushNotifs?.permission === 'granted' ? 'green' : 'gold'
+            }
+          />
+          <SettingRow
             icon={IHistory}
             label={t ? t('profile.alertHistory') || 'Historique des alertes' : 'Historique des alertes'}
             value={`${alertHistory?.alerts?.length || 0} ${t ? t('profile.entries') || 'entrées' : 'entrées'}`}
