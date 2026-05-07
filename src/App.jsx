@@ -284,6 +284,14 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertActive, ghostMode]);
 
+  // Listen for AI-triggered SOS event
+  useEffect(() => {
+    const onAiSos = () => triggerSOS('ai');
+    window.addEventListener('sos-africa:trigger-sos', onAiSos);
+    return () => window.removeEventListener('sos-africa:trigger-sos', onAiSos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Trigger SOS
   const triggerSOS = (type = 'sos') => {
     setAlertActive(true);

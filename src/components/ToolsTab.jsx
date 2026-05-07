@@ -21,6 +21,7 @@ import { ScreenHeading } from './ui/atoms';
 import AudioSheet from './sheets/AudioSheet';
 import VideoSheet from './sheets/VideoSheet';
 import FamilySheet from './sheets/FamilySheet';
+import AISheet from './sheets/AISheet';
 
 const ACCENT = {
   red: 'var(--red)',
@@ -630,14 +631,39 @@ const ToolsTab = ({
             )}
 
             {activeSheet === 'ai' && (
-              <div className="space-y-3">
-                <p className="text-[12.5px] text-white/65">
-                  L'assistant IA Premium répond à vos questions de sécurité 24/7.
-                </p>
-                <button onClick={closeSheet} className="tap btn-primary-red w-full py-3 rounded-xl font-bold">
-                  Fermer
-                </button>
-              </div>
+              <AISheet
+                location={location}
+                language={t ? 'fr' : 'fr'}
+                onAction={(actionId) => {
+                  // Map AI suggested actions to app handlers
+                  if (actionId === 'siren') {
+                    onSiren?.();
+                    closeSheet();
+                  } else if (actionId === 'share-location') {
+                    onShareLocation?.();
+                    closeSheet();
+                  } else if (actionId === 'fake-call') {
+                    closeSheet();
+                    setTimeout(() => setActiveSheet('fakecall'), 80);
+                  } else if (actionId === 'ghost') {
+                    onGhostMode?.();
+                    closeSheet();
+                  } else if (actionId === 'video') {
+                    closeSheet();
+                    setTimeout(() => setActiveSheet('video'), 80);
+                  } else if (actionId === 'audio-record') {
+                    closeSheet();
+                    setTimeout(() => setActiveSheet('audio'), 80);
+                  } else if (actionId === 'family') {
+                    closeSheet();
+                    setTimeout(() => setActiveSheet('family'), 80);
+                  } else if (actionId === 'sos') {
+                    // Bubble up via window event to App.jsx
+                    window.dispatchEvent(new CustomEvent('sos-africa:trigger-sos'));
+                    closeSheet();
+                  }
+                }}
+              />
             )}
           </div>
         </div>
