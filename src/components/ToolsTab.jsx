@@ -16,12 +16,14 @@ import {
   ICheck,
   IAlert,
   IClock,
+  IPin,
 } from './ui/icons';
 import { ScreenHeading } from './ui/atoms';
 import AudioSheet from './sheets/AudioSheet';
 import VideoSheet from './sheets/VideoSheet';
 import FamilySheet from './sheets/FamilySheet';
 import AISheet from './sheets/AISheet';
+import GeofencesSheet from './sheets/GeofencesSheet';
 import PremiumGate from './ui/PremiumGate';
 
 const ACCENT = {
@@ -258,6 +260,15 @@ const ToolsTab = ({
       onClick: onSiren,
     },
     {
+      id: 'geofences',
+      icon: IPin,
+      color: 'blue',
+      title: 'Zones de confiance',
+      desc: 'École, maison, bureau — alerte auto sur entrée/sortie.',
+      onClick: () => setActiveSheet('geofences'),
+      badge: !isPremium ? 'PREMIUM' : null,
+    },
+    {
       id: 'family',
       icon: IFamily,
       color: 'blue',
@@ -371,6 +382,7 @@ const ToolsTab = ({
                 {activeSheet === 'history' ? 'Historique' : null}
                 {activeSheet === 'video' ? 'SOS vidéo live' : null}
                 {activeSheet === 'ai' ? 'Assistant IA' : null}
+                {activeSheet === 'geofences' ? 'Zones de confiance' : null}
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-6"
@@ -537,6 +549,45 @@ const ToolsTab = ({
                 }}
                 onClose={closeSheet}
               />
+            )}
+
+            {activeSheet === 'geofences' && (
+              <PremiumGate
+                isPremium={isPremium}
+                title="Zones de confiance"
+                description="Définis des zones (école, maison, bureau) et reçois une notification dès qu'un membre de ta famille y entre ou en sort."
+                benefits={[
+                  'Jusqu\'à 10 zones par famille',
+                  'Alertes instantanées (entrée et sortie)',
+                  'Historique des passages',
+                  'Couleurs personnalisées par zone',
+                ]}
+                onUpgrade={() => {
+                  closeSheet();
+                  setTimeout(() => onUpgrade && onUpgrade(), 80);
+                }}
+              >
+                <GeofencesSheet
+                  familyId={
+                    typeof window !== 'undefined'
+                      ? localStorage.getItem('sos_family_id') || ''
+                      : ''
+                  }
+                  location={location}
+                  userProfile={userProfile}
+                  notifPermission={
+                    typeof Notification !== 'undefined'
+                      ? Notification.permission
+                      : 'default'
+                  }
+                  onRequestNotifPermission={async () => {
+                    if (typeof Notification === 'undefined') return;
+                    try {
+                      await Notification.requestPermission();
+                    } catch {}
+                  }}
+                />
+              </PremiumGate>
             )}
 
             {activeSheet === 'audio' && (

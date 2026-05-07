@@ -23,13 +23,18 @@ const LeafletMap = ({
   className = '',
   style = {},
   riskZones = [],
+  geofences = [],
   onZoneClick,
+  onMapClick,
 }) => {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const ringsRef = useRef([]);
   const zoneLayerRef = useRef(null);
+  const geofenceLayerRef = useRef(null);
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   useEffect(() => {
     const init = () => {
@@ -48,6 +53,12 @@ const LeafletMap = ({
         attribution: ATTRIBUTION,
       }).addTo(map);
       L.control.zoom({ position: 'bottomleft' }).addTo(map);
+      // Map tap → onMapClick callback
+      map.on('click', (e) => {
+        if (typeof onMapClickRef.current === 'function') {
+          onMapClickRef.current({ lat: e.latlng.lat, lng: e.latlng.lng });
+        }
+      });
       mapRef.current = map;
       return true;
     };
@@ -127,6 +138,51 @@ const LeafletMap = ({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [riskZones]);
+
+  // Render geofences (zones de confiance)
+  useEffect(() => {
+    const L = window.L;
+    const map = mapRef.current;
+    if (!L || !map) return;
+
+    if (geofenceLayerRef.current) {
+      geofenceLayerRef.current.clearLayers();
+    } else {
+      geofenceLayerRef.current = L.layerGroup().addTo(map);
+    }
+
+    geofences.forEach((g) => {
+      if (g.lat == null || g.lng == null || !g.radius) return;
+      const color = g.color || '#3D8BFF';
+      const circle = L.circle([g.lat, g.lng], {
+        radius: g.radius,
+        color,
+        weight: 2.5,
+        dashArray: '6 6',
+        fillColor: color,
+        fillOpacity: 0.10,
+      });
+      circle.bindTooltip(
+        `<b>${g.name || 'Zone'}</b><br/>Rayon ${Math.round(g.radius)} m`,
+        { direction: 'top', offset: [0, -8] }
+      );
+      // Center pin label
+      const labelIcon = L.divIcon({
+        className: 'sos-geofence-label',
+        html:
+          `<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;` +
+          `background:${color};border-radius:999px;color:#fff;font-size:10px;` +
+          `font-weight:700;white-space:nowrap;box-shadow:0 0 12px ${color}aa;">` +
+          `📍 ${g.name || 'Zone'}</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+      const marker = L.marker([g.lat, g.lng], { icon: labelIcon });
+      circle.addTo(geofenceLayerRef.current);
+      marker.addTo(geofenceLayerRef.current);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geofences]);
 
   // Cleanup
   useEffect(() => {

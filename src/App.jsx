@@ -16,6 +16,7 @@ import { useTheme } from './hooks/useTheme';
 import { useAnalytics } from './hooks/useAnalytics';
 import { usePremiumStatus } from './hooks/usePremiumStatus';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { useGeofences } from './hooks/useGeofences';
 
 // New design components
 import AppHeader from './components/ui/AppHeader';
@@ -178,6 +179,19 @@ const App = () => {
   // Push notifications (FCM) - only request when user is interactive,
   // so we don't spam permission popup at boot.
   const pushNotifs = usePushNotifications(userId);
+
+  // Always-on geofence monitoring (Premium only)
+  // Works as long as the app/PWA tab is open in foreground.
+  const familyId = typeof window !== 'undefined'
+    ? localStorage.getItem('sos_family_id') || ''
+    : '';
+  useGeofences({
+    familyId,
+    location,
+    userId,
+    userName: userProfile.getFullName?.() || userProfile.firstName || userId,
+    enabled: isPremium && !!familyId,
+  });
 
   // Shake detection
   const handleShake = useCallback(() => {
