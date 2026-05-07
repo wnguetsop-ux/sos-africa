@@ -34,15 +34,19 @@ const AppHeader = ({
             <span className="text-[color:var(--red)]">SOS</span>{' '}
             <span className="text-white">Africa</span>
           </div>
-          <div className="text-[10.5px] flex items-center gap-1 text-[color:var(--green-soft)]">
+          <div
+            className="text-[10.5px] flex items-center gap-1"
+            style={{ color: online ? 'var(--green-soft)' : 'var(--amber)' }}
+          >
             <span
               className="w-1.5 h-1.5 rounded-full"
               style={{
                 background: online ? 'var(--green)' : 'var(--amber)',
                 boxShadow: `0 0 8px ${online ? 'var(--green)' : 'var(--amber)'}`,
+                animation: !online ? 'blink 1.4s infinite' : 'none',
               }}
             />
-            {online ? 'En ligne · sécurisé' : 'Hors ligne'}
+            {online ? 'En ligne · sécurisé' : 'Hors ligne · SOS local actif'}
           </div>
         </div>
       </button>
