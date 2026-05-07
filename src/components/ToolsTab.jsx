@@ -17,6 +17,8 @@ import {
   IAlert,
   IClock,
   IPin,
+  IPhone,
+  ILock,
 } from './ui/icons';
 import { ScreenHeading } from './ui/atoms';
 import AudioSheet from './sheets/AudioSheet';
@@ -25,6 +27,8 @@ import FamilySheet from './sheets/FamilySheet';
 import AISheet from './sheets/AISheet';
 import GeofencesSheet from './sheets/GeofencesSheet';
 import TaxiSafeSheet from './sheets/TaxiSafeSheet';
+import FakeCompanionSheet from './sheets/FakeCompanionSheet';
+import VaultSheet from './sheets/VaultSheet';
 import PremiumGate from './ui/PremiumGate';
 
 const ACCENT = {
@@ -284,6 +288,24 @@ const ToolsTab = ({
         : null,
     },
     {
+      id: 'companion',
+      icon: IPhone,
+      color: 'purple',
+      title: 'Faux compagnon vocal',
+      desc: 'Voix qui parle "comme si" pour décourager les agresseurs.',
+      onClick: () => setActiveSheet('companion'),
+      badge: !isPremium ? 'PREMIUM' : null,
+    },
+    {
+      id: 'vault',
+      icon: ILock,
+      color: 'blue',
+      title: 'Coffre-fort documents',
+      desc: 'Pièces ID, vaccins, contrats — toujours sous la main.',
+      onClick: () => setActiveSheet('vault'),
+      badge: !isPremium ? '3 GRATUITS' : null,
+    },
+    {
       id: 'family',
       icon: IFamily,
       color: 'blue',
@@ -399,6 +421,8 @@ const ToolsTab = ({
                 {activeSheet === 'ai' ? 'Assistant IA' : null}
                 {activeSheet === 'geofences' ? 'Zones de confiance' : null}
                 {activeSheet === 'taxi' ? 'Mode Taxi Safe' : null}
+                {activeSheet === 'companion' ? 'Faux compagnon' : null}
+                {activeSheet === 'vault' ? 'Coffre-fort' : null}
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pb-6"
@@ -564,6 +588,37 @@ const ToolsTab = ({
                   setTimeout(() => onUpgrade && onUpgrade(), 80);
                 }}
                 onClose={closeSheet}
+              />
+            )}
+
+            {activeSheet === 'companion' && (
+              <PremiumGate
+                isPremium={isPremium}
+                title="Faux compagnon vocal"
+                description="Une voix qui parle à voix haute comme si quelqu'un t'attendait. Idéal quand tu rentres seule la nuit ou que tu te sens suivie."
+                benefits={[
+                  '4 scénarios de conversation réalistes',
+                  'Voix masculine ou féminine selon contexte',
+                  'Lecture sans connexion internet',
+                  'Volume max conseillé',
+                ]}
+                onUpgrade={() => {
+                  closeSheet();
+                  setTimeout(() => onUpgrade && onUpgrade(), 80);
+                }}
+              >
+                <FakeCompanionSheet onClose={closeSheet} />
+              </PremiumGate>
+            )}
+
+            {activeSheet === 'vault' && (
+              <VaultSheet
+                userProfile={userProfile}
+                isPremium={isPremium}
+                onUpgrade={() => {
+                  closeSheet();
+                  setTimeout(() => onUpgrade && onUpgrade(), 80);
+                }}
               />
             )}
 
