@@ -45,10 +45,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.AFRICAS_TALKING_API_KEY;
-  const username = process.env.AFRICAS_TALKING_USERNAME || 'sandbox';
-  const senderId = process.env.AFRICAS_TALKING_SENDER_ID || null;
-  const defaultCountry = process.env.AFRICAS_TALKING_DEFAULT_COUNTRY || '237';
+  // Trim defensif au cas où l'env var contient des newlines/espaces parasites
+  const apiKey = (process.env.AFRICAS_TALKING_API_KEY || '').trim();
+  const username = (process.env.AFRICAS_TALKING_USERNAME || 'sandbox').trim() || 'sandbox';
+  const senderId = (process.env.AFRICAS_TALKING_SENDER_ID || '').trim() || null;
+  const defaultCountry = (process.env.AFRICAS_TALKING_DEFAULT_COUNTRY || '237').trim() || '237';
 
   if (!apiKey) {
     return res.status(503).json({
