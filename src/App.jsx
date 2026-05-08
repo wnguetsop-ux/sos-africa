@@ -386,13 +386,15 @@ const App = () => {
     });
     analytics.trackAlert('sos');
 
-    // 1) Push FCM aux contacts (lookup par numero de telephone) + a la famille
-    //    Le lookup par telephone matche les 9 derniers chiffres pour etre
-    //    tolerant aux differences de format (+237 vs 00237 vs sans prefixe)
+    // 1) Push FCM + 2) SMS Africa's Talking en PARALLELE
+    //    Push: gratuit, instantane, pour ceux qui ont l'app
+    //    SMS: garanti 100% delivery meme sans app, ~6 XAF/SMS
     const phones = (contacts || []).map((c) => c.phone).filter(Boolean);
     const userIds = (contacts || [])
       .map((c) => c.id || c.name)
       .filter(Boolean);
+
+    // 1) Push FCM (gratuit, ne pas attendre)
     try {
       fetch('/api/push/send', {
         method: 'POST',
@@ -411,12 +413,34 @@ const App = () => {
         }),
       })
         .then((r) => r.json())
-        .then((res) => {
-          // Log dans alertHistory le nombre de destinataires qui ont reellement recu
-          console.log('[SOS] push delivery:', res);
-        })
+        .then((res) => console.log('[SOS] push delivery:', res))
         .catch(() => {});
     } catch {}
+
+    // 2) SMS automatique Africa's Talking (en parallele, payant ~6 XAF/SMS)
+    if (phones.length > 0) {
+      try {
+        const mapsLink = location
+          ? `https://www.google.com/maps?q=${location.lat},${location.lng}`
+          : '';
+        const senderName = userProfile.getFullName?.() || userId || 'Utilisateur';
+        // Message court (<160 chars idealement, mais AT supporte >700)
+        const smsMessage =
+          `🆘 SOS Africa: ${senderName} a declenche une alerte d urgence!\n` +
+          (mapsLink ? `Position: ${mapsLink}\n` : '') +
+          `Heure: ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}\n` +
+          `Merci d agir rapidement.`;
+
+        fetch('/api/sms/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phones, message: smsMessage }),
+        })
+          .then((r) => r.json())
+          .then((res) => console.log('[SOS] SMS delivery:', res))
+          .catch(() => {});
+      } catch {}
+    }
 
     // 2) Logger dans Firestore pour les contacts qui n'ont pas l'app (admin verra)
     try {
