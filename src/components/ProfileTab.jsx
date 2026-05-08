@@ -217,6 +217,8 @@ const ProfileTab = ({
   const [showChildTracker, setShowChildTracker] = useState(false);
   const [showCodeWord, setShowCodeWord] = useState(false);
   const [showActivation, setShowActivation] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushToast, setPushToast] = useState(null);
   const [codeWord, setCodeWord] = useState(
     () => localStorage.getItem('sos_code_word') || ''
   );
@@ -560,22 +562,49 @@ const ProfileTab = ({
             icon={IBell}
             label="Notifications push"
             value={
-              !pushNotifs?.supported
-                ? 'Non supporté sur cet appareil'
-                : pushNotifs.permission === 'granted'
+              pushBusy
+                ? 'Activation en cours…'
+                : pushNotifs?.permission === 'granted' && pushNotifs?.token
                 ? '✅ Activées · ne rate plus une alerte famille'
-                : pushNotifs.permission === 'denied'
-                ? '⚠️ Refusées (active dans les paramètres du navigateur)'
+                : pushNotifs?.permission === 'granted'
+                ? '⚠️ Permission OK mais token manquant — touche pour réessayer'
+                : pushNotifs?.permission === 'denied'
+                ? '⚠️ Refusées dans le navigateur'
                 : 'Touche pour activer'
             }
             onClick={async () => {
-              if (!pushNotifs?.supported) return;
-              if (pushNotifs.permission === 'granted') return;
-              await pushNotifs.requestPermission?.();
+              if (pushBusy) return;
+              setPushBusy(true);
+              setPushToast({ type: 'info', text: 'Demande de permission…' });
+              try {
+                const t = await pushNotifs?.requestPermission?.();
+                if (t) {
+                  setPushToast({ type: 'success', text: '✅ Notifications activées !' });
+                } else if (pushNotifs?.error) {
+                  setPushToast({ type: 'error', text: pushNotifs.error });
+                } else if (pushNotifs?.permission === 'denied') {
+                  setPushToast({
+                    type: 'error',
+                    text: 'Notifications refusées. Va dans les paramètres du navigateur.',
+                  });
+                } else {
+                  setPushToast({
+                    type: 'error',
+                    text:
+                      "Échec inconnu. Vérifie : HTTPS, app ajoutée à l'écran d'accueil sur iPhone.",
+                  });
+                }
+              } catch (err) {
+                setPushToast({
+                  type: 'error',
+                  text: err?.message || 'Erreur',
+                });
+              } finally {
+                setPushBusy(false);
+                setTimeout(() => setPushToast(null), 5000);
+              }
             }}
-            color={
-              pushNotifs?.permission === 'granted' ? 'green' : 'gold'
-            }
+            color={pushNotifs?.permission === 'granted' ? 'green' : 'gold'}
           />
           <SettingRow
             icon={IHistory}
@@ -613,6 +642,24 @@ const ProfileTab = ({
       </div>
 
       {/* Child tracker preview modal */}
+      {/* Toast push */}
+      {pushToast && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 bottom-28 z-50 px-4 py-3 rounded-2xl glass-strong text-[12.5px] font-bold text-white max-w-[340px] text-center"
+          style={{
+            borderColor:
+              pushToast.type === 'error'
+                ? 'rgba(255,46,63,.5)'
+                : pushToast.type === 'success'
+                ? 'rgba(34,214,123,.5)'
+                : 'rgba(61,139,255,.5)',
+            boxShadow: '0 12px 40px rgba(0,0,0,.4)',
+          }}
+        >
+          {pushToast.text}
+        </div>
+      )}
+
       {showChildTracker && (
         <ChildTrackerSheet
           userProfile={userProfile}

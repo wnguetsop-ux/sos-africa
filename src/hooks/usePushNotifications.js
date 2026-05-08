@@ -51,31 +51,53 @@ export const usePushNotifications = (userId) => {
   }, []);
 
   const requestPermission = async () => {
-    if (!supported) {
-      setError('Notifications non supportées sur cet appareil.');
+    setError(null);
+    // 1) Prefer the native browser Notification API for the prompt
+    //    (works even if FCM-specific isSupported() returned false)
+    if (typeof Notification === 'undefined') {
+      setError('Notifications non supportées sur ce navigateur.');
       return null;
     }
-    if (!VAPID_KEY) {
+    let perm = Notification.permission;
+    try {
+      if (perm === 'default') {
+        perm = await Notification.requestPermission();
+      }
+      setPermission(perm);
+    } catch (err) {
+      console.error('Notification.requestPermission error:', err);
       setError(
-        'Clé VAPID manquante. Voir Firebase Console > Cloud Messaging > Web push.'
+        "Le navigateur n'a pas autorisé la demande. Vérifie HTTPS + paramètres."
       );
       return null;
     }
-    try {
-      const perm = await Notification.requestPermission();
-      setPermission(perm);
-      if (perm !== 'granted') return null;
+    if (perm !== 'granted') {
+      if (perm === 'denied') {
+        setError(
+          'Notifications bloquées. Va dans les paramètres du navigateur pour les autoriser.'
+        );
+      }
+      return null;
+    }
 
+    // 2) Try to get an FCM token (might fail on iOS, old browsers, etc.)
+    if (!VAPID_KEY) {
+      setError('Clé VAPID manquante côté app.');
+      return null;
+    }
+    try {
+      // SW must be registered first (main.jsx does it). Wait briefly if needed.
+      let swReg = await navigator.serviceWorker?.getRegistration?.();
+      if (!swReg && navigator.serviceWorker?.ready) {
+        swReg = await navigator.serviceWorker.ready;
+      }
       const messaging = getMessaging(firebaseApp);
-      // Need our SW registered first
-      const swReg = await navigator.serviceWorker.getRegistration();
       const t = await getToken(messaging, {
         vapidKey: VAPID_KEY,
         serviceWorkerRegistration: swReg,
       });
       if (t) {
         setToken(t);
-        // Save token to Firestore so we can target this user
         if (userId) {
           await setDoc(
             doc(db, 'fcmTokens', userId),
@@ -86,14 +108,24 @@ export const usePushNotifications = (userId) => {
               updatedAt: serverTimestamp(),
             },
             { merge: true }
-          ).catch(() => {});
+          ).catch((e) =>
+            console.warn('fcmTokens write failed (Firestore Rules ?):', e.code)
+          );
         }
         return t;
       }
+      // Permission granted but no token — typically iOS without PWA install
+      setError(
+        "Permission OK mais token FCM indisponible. Sur iPhone : ajoute l'app à l'écran d'accueil pour activer les push."
+      );
       return null;
     } catch (err) {
-      console.error('FCM error:', err);
-      setError(err.message || 'fcm_error');
+      console.error('FCM getToken error:', err);
+      setError(
+        err?.code === 'messaging/unsupported-browser'
+          ? "Push non supporté ici. Sur iPhone : ajoute l'app à l'écran d'accueil."
+          : err?.message || "Erreur lors de l'obtention du token FCM."
+      );
       return null;
     }
   };
