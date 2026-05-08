@@ -60,6 +60,54 @@ export const usePushNotifications = (userId, userPhone) => {
     };
   }, []);
 
+  // AUTO-RESYNC : si la permission est deja granted ET qu'on a un userId/phone,
+  // re-fetch silencieusement le token FCM et MERGE dans Firestore avec les
+  // champs phone/phoneTail. Resout le bug 'phoneTail null' pour les users
+  // qui ont active avant l'ajout du champ.
+  useEffect(() => {
+    if (!supported || !userId) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted')
+      return;
+    if (!VAPID_KEY) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        let swReg = await navigator.serviceWorker?.getRegistration?.();
+        if (!swReg && navigator.serviceWorker?.ready) {
+          swReg = await navigator.serviceWorker.ready;
+        }
+        const messaging = getMessaging(firebaseApp);
+        const t = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swReg,
+        });
+        if (cancelled || !t) return;
+        setToken(t);
+        const phone = normalizePhone(userPhone);
+        const phoneTail = phone ? phone.replace(/\D/g, '').slice(-9) : null;
+        await setDoc(
+          doc(db, 'fcmTokens', userId),
+          {
+            token: t,
+            userId,
+            // n'ecrase PAS le phone si null venant de userProfile vide
+            ...(phone ? { phone } : {}),
+            ...(phoneTail ? { phoneTail } : {}),
+            userAgent: navigator.userAgent,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        ).catch(() => {});
+      } catch (err) {
+        // silencieux — pas d'UI bloquante
+        console.warn('FCM auto-resync failed:', err.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supported, userId, userPhone]);
+
   const requestPermission = async () => {
     setError(null);
     // 1) Prefer the native browser Notification API for the prompt

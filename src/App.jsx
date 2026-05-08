@@ -181,10 +181,12 @@ const App = () => {
   // so we don't spam permission popup at boot.
   // On passe aussi le numero de telephone pour permettre le lookup par phone
   // depuis les SOS d'autres utilisateurs.
-  const pushNotifs = usePushNotifications(
-    userId,
-    userProfile?.phone || userProfile?.phoneNumber || null
-  );
+  // userProfile.profile contient le vrai shape (firstName, lastName, phone, ...)
+  const userPhoneFromProfile =
+    userProfile?.profile?.phone ||
+    userProfile?.phone ||
+    null;
+  const pushNotifs = usePushNotifications(userId, userPhoneFromProfile);
 
   // Always-on geofence monitoring (Premium only)
   // Works as long as the app/PWA tab is open in foreground.
