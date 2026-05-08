@@ -102,7 +102,25 @@ export default async function handler(req, res) {
       body: formData.toString(),
     });
 
-    const data = await upstream.json();
+    // AT renvoie parfois du texte au lieu de JSON quand auth/credentials invalides.
+    // On lit en texte d'abord, puis on essaie de parser.
+    const rawText = await upstream.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      // Reponse non-JSON = erreur d'auth/clé/username
+      console.error('AT non-JSON response:', upstream.status, rawText);
+      return res.status(502).json({
+        error: 'AT auth or config error',
+        status: upstream.status,
+        provider_message: rawText.slice(0, 500),
+        hint:
+          "Verifie : (1) AFRICAS_TALKING_API_KEY est valide, (2) AFRICAS_TALKING_USERNAME match le compte (sandbox vs production), (3) la cle a ete generee dans le bon environnement.",
+        url_used: url,
+        username_used: username,
+      });
+    }
 
     if (!upstream.ok) {
       console.error('AfricasTalking error:', upstream.status, data);
