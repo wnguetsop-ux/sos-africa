@@ -21,9 +21,19 @@ const VAPID_KEY =
  *
  * Côté code : ce hook demande la permission notif au boot, récupère le token FCM,
  * l'enregistre dans Firestore (collection 'fcmTokens/{userId}') pour qu'on puisse
- * envoyer un push à un utilisateur précis.
+ * envoyer un push à un utilisateur précis OU par numéro de téléphone (clé phone).
  */
-export const usePushNotifications = (userId) => {
+const normalizePhone = (raw) => {
+  if (!raw) return null;
+  // garde uniquement chiffres et +, retire indicatif éventuel pour normaliser
+  let s = String(raw).replace(/[^\d+]/g, '');
+  // remove leading 00 (international prefix)
+  if (s.startsWith('00')) s = '+' + s.slice(2);
+  // si pas de +, on prefixe (mais on ne devine pas le pays)
+  return s;
+};
+
+export const usePushNotifications = (userId, userPhone) => {
   const [permission, setPermission] = useState('default');
   const [token, setToken] = useState(null);
   const [supported, setSupported] = useState(false);
@@ -99,11 +109,17 @@ export const usePushNotifications = (userId) => {
       if (t) {
         setToken(t);
         if (userId) {
+          const phone = normalizePhone(userPhone);
+          // Generate also a 'phoneTail' (last 9 digits) for matching tolerant
+          // queries when the sender wrote the phone differently
+          const phoneTail = phone ? phone.replace(/\D/g, '').slice(-9) : null;
           await setDoc(
             doc(db, 'fcmTokens', userId),
             {
               token: t,
               userId,
+              phone: phone || null,
+              phoneTail: phoneTail || null,
               userAgent: navigator.userAgent,
               updatedAt: serverTimestamp(),
             },

@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   try {
     initAdmin();
     const db = admin.firestore();
-    const { userIds, familyId, title, body, data } = req.body || {};
+    const { userIds, phones, familyId, title, body, data } = req.body || {};
 
     if (!title || !body) {
       return res.status(400).json({ error: 'title and body are required' });
@@ -60,26 +60,57 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!targetUserIds.length) {
-      return res.status(400).json({ error: 'No target users' });
-    }
-
-    // Fetch tokens
-    const tokens = [];
+    // Fetch tokens by direct userId
+    const tokensSet = new Set();
     for (const uid of targetUserIds) {
       try {
         const doc = await db.collection('fcmTokens').doc(uid).get();
-        if (doc.exists && doc.data()?.token) tokens.push(doc.data().token);
+        if (doc.exists && doc.data()?.token) tokensSet.add(doc.data().token);
       } catch (e) {
         // continue
       }
     }
 
+    // Lookup tokens by phone (matching last 9 digits — tolerant)
+    if (Array.isArray(phones) && phones.length) {
+      const tails = phones
+        .map((p) => String(p || '').replace(/\D/g, '').slice(-9))
+        .filter((s) => s.length >= 8);
+      if (tails.length) {
+        // Firestore 'in' supports up to 30 values per query; chunk if needed
+        const chunks = [];
+        for (let i = 0; i < tails.length; i += 30) {
+          chunks.push(tails.slice(i, i + 30));
+        }
+        for (const ch of chunks) {
+          try {
+            const snap = await db
+              .collection('fcmTokens')
+              .where('phoneTail', 'in', ch)
+              .get();
+            snap.forEach((d) => {
+              const t = d.data()?.token;
+              if (t) tokensSet.add(t);
+            });
+          } catch (e) {
+            console.warn('phoneTail query failed:', e.message);
+          }
+        }
+      }
+    }
+
+    if (!targetUserIds.length && !phones?.length) {
+      return res.status(400).json({ error: 'No target users or phones' });
+    }
+
+    const tokens = Array.from(tokensSet);
+
     if (!tokens.length) {
       return res.status(200).json({
         sent: 0,
         targets: targetUserIds.length,
-        note: 'No FCM tokens registered for these users',
+        phonesQueried: (phones || []).length,
+        note: "Aucun token FCM trouvé. Le destinataire doit avoir activé les notifications dans son profil SOS Africa.",
       });
     }
 

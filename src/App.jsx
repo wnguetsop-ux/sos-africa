@@ -179,7 +179,12 @@ const App = () => {
   const { isPremium, limits: premiumLimits } = premiumStatus;
   // Push notifications (FCM) - only request when user is interactive,
   // so we don't spam permission popup at boot.
-  const pushNotifs = usePushNotifications(userId);
+  // On passe aussi le numero de telephone pour permettre le lookup par phone
+  // depuis les SOS d'autres utilisateurs.
+  const pushNotifs = usePushNotifications(
+    userId,
+    userProfile?.phone || userProfile?.phoneNumber || null
+  );
 
   // Always-on geofence monitoring (Premium only)
   // Works as long as the app/PWA tab is open in foreground.
@@ -379,7 +384,10 @@ const App = () => {
     });
     analytics.trackAlert('sos');
 
-    // 1) Push FCM aux contacts qui ont l'app + à la famille (instantané, gratuit, pas de page blanche)
+    // 1) Push FCM aux contacts (lookup par numero de telephone) + a la famille
+    //    Le lookup par telephone matche les 9 derniers chiffres pour etre
+    //    tolerant aux differences de format (+237 vs 00237 vs sans prefixe)
+    const phones = (contacts || []).map((c) => c.phone).filter(Boolean);
     const userIds = (contacts || [])
       .map((c) => c.id || c.name)
       .filter(Boolean);
@@ -388,17 +396,24 @@ const App = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          phones,
           userIds,
           familyId,
           title: '🆘 ALERTE SOS',
-          body: `${userProfile.getFullName?.() || userId} a déclenché une alerte d'urgence`,
+          body: `${userProfile.getFullName?.() || userId} a déclenché une alerte d'urgence — touche pour voir la position`,
           data: {
             url: location ? `https://www.google.com/maps?q=${location.lat},${location.lng}` : '/',
             type: 'sos',
             urgent: 'true',
           },
         }),
-      }).catch(() => {});
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          // Log dans alertHistory le nombre de destinataires qui ont reellement recu
+          console.log('[SOS] push delivery:', res);
+        })
+        .catch(() => {});
     } catch {}
 
     // 2) Logger dans Firestore pour les contacts qui n'ont pas l'app (admin verra)
