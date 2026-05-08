@@ -25,6 +25,8 @@ import {
   IBrain,
   ISend,
   IClock,
+  IPhone,
+  IX,
 } from './ui/icons';
 
 const PremiumShield = () => (
@@ -219,6 +221,12 @@ const ProfileTab = ({
   const [showActivation, setShowActivation] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushToast, setPushToast] = useState(null);
+  const [showPhoneSetup, setShowPhoneSetup] = useState(false);
+  const [phoneInput, setPhoneInput] = useState(
+    () => userProfile?.profile?.phone || userProfile?.phone || ''
+  );
+  const currentPhone =
+    userProfile?.profile?.phone || userProfile?.phone || '';
   const [codeWord, setCodeWord] = useState(
     () => localStorage.getItem('sos_code_word') || ''
   );
@@ -558,14 +566,31 @@ const ProfileTab = ({
             onClick={() => setTheme && setTheme(isDark ? 'light' : 'dark')}
             color="gold"
           />
+          {/* Numero de telephone - critique pour recevoir les SOS des contacts */}
+          <SettingRow
+            icon={IPhone}
+            label="Mon numéro de téléphone"
+            value={
+              currentPhone
+                ? `${currentPhone} · touche pour modifier`
+                : '⚠️ Requis pour recevoir les SOS — touche pour saisir'
+            }
+            onClick={() => {
+              setPhoneInput(currentPhone);
+              setShowPhoneSetup(true);
+            }}
+            color={currentPhone ? 'green' : 'amber'}
+          />
           <SettingRow
             icon={IBell}
             label="Notifications push"
             value={
               pushBusy
                 ? 'Activation en cours…'
+                : !currentPhone
+                ? '⚠️ Saisir d\'abord ton numéro ci-dessus'
                 : pushNotifs?.permission === 'granted' && pushNotifs?.token
-                ? '✅ Activées · ne rate plus une alerte famille'
+                ? '✅ Activées · prêt à recevoir les alertes'
                 : pushNotifs?.permission === 'granted'
                 ? '⚠️ Permission OK mais token manquant — touche pour réessayer'
                 : pushNotifs?.permission === 'denied'
@@ -574,12 +599,23 @@ const ProfileTab = ({
             }
             onClick={async () => {
               if (pushBusy) return;
+              if (!currentPhone) {
+                setPushToast({
+                  type: 'error',
+                  text: 'Saisis d\'abord ton numéro de téléphone (ligne au-dessus).',
+                });
+                setTimeout(() => setPushToast(null), 5000);
+                return;
+              }
               setPushBusy(true);
-              setPushToast({ type: 'info', text: 'Demande de permission…' });
+              setPushToast({ type: 'info', text: 'Activation…' });
               try {
                 const t = await pushNotifs?.requestPermission?.();
                 if (t) {
-                  setPushToast({ type: 'success', text: '✅ Notifications activées !' });
+                  setPushToast({
+                    type: 'success',
+                    text: '✅ Notifications activées avec le numéro ' + currentPhone,
+                  });
                 } else if (pushNotifs?.error) {
                   setPushToast({ type: 'error', text: pushNotifs.error });
                 } else if (pushNotifs?.permission === 'denied') {
@@ -591,7 +627,7 @@ const ProfileTab = ({
                   setPushToast({
                     type: 'error',
                     text:
-                      "Échec inconnu. Vérifie : HTTPS, app ajoutée à l'écran d'accueil sur iPhone.",
+                      "Échec. Sur iPhone : ajoute l'app à l'écran d'accueil d'abord.",
                   });
                 }
               } catch (err) {
@@ -604,7 +640,13 @@ const ProfileTab = ({
                 setTimeout(() => setPushToast(null), 5000);
               }
             }}
-            color={pushNotifs?.permission === 'granted' ? 'green' : 'gold'}
+            color={
+              !currentPhone
+                ? 'amber'
+                : pushNotifs?.permission === 'granted' && pushNotifs?.token
+                ? 'green'
+                : 'gold'
+            }
           />
           <SettingRow
             icon={IHistory}
@@ -642,6 +684,80 @@ const ProfileTab = ({
       </div>
 
       {/* Child tracker preview modal */}
+      {/* Phone setup modal */}
+      {showPhoneSetup && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setShowPhoneSetup(false)}
+          />
+          <div className="relative w-full max-w-md glass-strong rounded-t-3xl sm:rounded-3xl p-5 sm:m-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <IPhone size={18} className="text-[color:var(--blue)]" />
+                <div className="text-[16px] font-extrabold text-white font-display">
+                  Mon numéro de téléphone
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPhoneSetup(false)}
+                className="tap w-9 h-9 rounded-full glass flex items-center justify-center text-white/85"
+                style={{ borderColor: 'var(--stroke)' }}
+              >
+                <IX size={16} />
+              </button>
+            </div>
+            <p className="text-[12px] text-white/65 mb-3 leading-snug">
+              Ce numéro est utilisé pour <b>recevoir les alertes SOS</b> que tes proches t'envoient depuis leur app. Sans ce numéro, ils ne pourront pas te joindre automatiquement.
+            </p>
+            <input
+              type="tel"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="+237 6XX XX XX XX"
+              autoFocus
+              className="w-full px-3 py-3 rounded-xl glass text-[16px] font-mono text-white placeholder-white/40 mb-3"
+              style={{ borderColor: 'var(--stroke)' }}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPhoneSetup(false)}
+                className="tap glass flex-1 py-3 rounded-xl text-[13px] font-bold text-white/85"
+                style={{ borderColor: 'var(--stroke)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  const cleaned = phoneInput.trim();
+                  if (!cleaned || cleaned.replace(/\D/g, '').length < 8) {
+                    setPushToast({ type: 'error', text: 'Numéro invalide' });
+                    setTimeout(() => setPushToast(null), 3000);
+                    return;
+                  }
+                  // Save phone in userProfile
+                  if (userProfile?.saveProfile) {
+                    await userProfile.saveProfile({ phone: cleaned });
+                  } else if (userProfile?.updateProfile) {
+                    await userProfile.updateProfile({ phone: cleaned });
+                  }
+                  setShowPhoneSetup(false);
+                  setPushToast({
+                    type: 'success',
+                    text: 'Numéro enregistré. Active maintenant les notifications push.',
+                  });
+                  setTimeout(() => setPushToast(null), 5000);
+                }}
+                className="tap btn-primary-green flex-1 py-3 rounded-xl text-[13px] font-extrabold flex items-center justify-center gap-1.5"
+              >
+                <ICheck size={14} stroke={3} /> Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast push */}
       {pushToast && (
         <div
